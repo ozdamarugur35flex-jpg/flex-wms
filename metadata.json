@@ -1,0 +1,7 @@
+{
+  "name": "Flex WMS Web Portal",
+  "description": "Modern web-based Warehouse Management System featuring real-time monitoring, stock definitions, and advanced warehouse operations.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
