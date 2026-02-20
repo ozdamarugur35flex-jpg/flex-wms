@@ -4,9 +4,7 @@
  * Backend: .NET Core Web API (StocksController)
  */
 
-const API_BASE_URL = window.location.hostname === 'localhost' 
-  ? 'http://localhost:5000/api' 
-  : '/api';
+const API_BASE_URL = '/api';
 
 // --- MOCK DATA FALLBACK ---
 const MOCK_STOCKS = [

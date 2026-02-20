@@ -6,6 +6,8 @@ export interface StockCard {
   name: string;
   englishName?: string;
   barcode1?: string;
+  barcode2?: string;
+  barcode3?: string;
   groupCode?: string;
   unit1: string;
   purchaseVat: number;
@@ -19,9 +21,18 @@ export interface StockCard {
   isAutoConsumption: boolean;
   imageUrl?: string;
   lastUpdated?: string;
-  category?: string; // UI Filtreleme için
-  // Added to fix StockList and PurchaseRequisition errors where this property is accessed or initialized
+  category?: string;
   lastPurchasePrice?: number;
+  producerCode?: string;
+  customsCode?: string;
+  width?: number;
+  height?: number;
+  depth?: number;
+  kod1?: string;
+  kod2?: string;
+  kod3?: string;
+  kod4?: string;
+  kod5?: string;
 }
 
 export interface CustomerCard { 

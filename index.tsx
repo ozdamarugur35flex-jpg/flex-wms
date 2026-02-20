@@ -2,6 +2,15 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App';
 
+// Suppress Recharts defaultProps warnings
+const originalWarn = console.error;
+console.error = (...args) => {
+  if (typeof args[0] === 'string' && args[0].includes('Support for defaultProps will be removed from function components')) {
+    return;
+  }
+  originalWarn(...args);
+};
+
 console.log("Flex WMS: Önyükleme başlatıldı...");
 
 const container = document.getElementById('root');
