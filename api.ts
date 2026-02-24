@@ -4,7 +4,8 @@
  * Backend: .NET Core Web API (StocksController)
  */
 
-const API_BASE_URL = '/api';
+// Kendi sunucu IP'nizi veya alan adınızı buraya yazın (Örn: 'http://192.168.1.10/api')
+const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
 // --- MOCK DATA FALLBACK ---
 const MOCK_STOCKS = [
