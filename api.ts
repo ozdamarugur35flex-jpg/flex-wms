@@ -13,7 +13,7 @@ const MOCK_STOCKS = [
   { id: '2', code: 'SMN-M8', name: 'Çelik Somun M8', unit1: 'ADET', quantity: 15500, minStockLevel: 1000, lastPurchasePrice: 1.25, isLocked: false, groupCode: 'BAĞLANTI' },
 ];
 
-const request = async (url: string, options?: RequestInit, fallbackData?: any) => {
+const request = async (url: string, options?: RequestInit, fallbackData?: any, mapper?: (item: any) => any) => {
   try {
     const response = await fetch(url, options);
     if (!response.ok) return fallbackData;
@@ -23,10 +23,12 @@ const request = async (url: string, options?: RequestInit, fallbackData?: any) =
       const data = await response.json();
       
       // Handle PascalCase to camelCase mapping if needed (common in .NET APIs)
-      if (Array.isArray(data)) {
-        return data.map(item => mapStockData(item));
-      } else if (data && typeof data === 'object') {
-        return mapStockData(data);
+      if (mapper) {
+        if (Array.isArray(data)) {
+          return data.map(item => mapper(item));
+        } else if (data && typeof data === 'object') {
+          return mapper(data);
+        }
       }
       
       return data;
@@ -37,6 +39,35 @@ const request = async (url: string, options?: RequestInit, fallbackData?: any) =
     console.error(`API Error: ${url}`, error);
     return fallbackData;
   }
+};
+
+// Helper to map Netsis/PascalCase fields to our camelCase interface
+const mapCustomerData = (item: any) => {
+  if (!item) return item;
+  return {
+    id: item.id || item.Id || item.code || item.Code || Math.random().toString(36).substr(2, 9),
+    code: item.code || item.Code || '',
+    name: item.name || item.Name || 'İSİMSİZ CARİ',
+    type: item.type || item.Type || 'Alıcı',
+    locationType: item.locationType || item.LocationType || 'Yurt İçi',
+    taxNumber: item.taxNumber || item.TaxNumber || '',
+    taxOffice: item.taxOffice || item.TaxOffice || '',
+    phone: item.phone || item.Phone || '',
+    email: item.email || item.Email || '',
+  };
+};
+
+// Helper to map Netsis/PascalCase fields to our camelCase interface
+const mapWarehouseData = (item: any) => {
+  if (!item) return item;
+  return {
+    id: item.id || item.Id || item.code || item.Code || Math.random().toString(36).substr(2, 9),
+    code: item.code || item.Code || '',
+    name: item.name || item.Name || 'İSİMSİZ DEPO',
+    isLocked: !!(item.isLocked || item.IsLocked || item.depoKilitle === 'E' || item.DepoKilitle === 'E'),
+    isLocationTracking: !!(item.isLocationTracking || item.IsLocationTracking),
+    lastActivity: item.lastActivity || item.LastActivity || '',
+  };
 };
 
 // Helper to map Netsis/PascalCase fields to our camelCase interface
@@ -81,15 +112,15 @@ export const apiService = {
   stocks: {
     // [GET] /api/stocks
     getAll: (includeYM: boolean = true) => 
-      request(`${API_BASE_URL}/stocks?includeYM=${includeYM}`, undefined, MOCK_STOCKS),
+      request(`${API_BASE_URL}/stocks?includeYM=${includeYM}`, undefined, MOCK_STOCKS, mapStockData),
     
     // Fix: Added missing getMinLevels method required by MinStockList.tsx
     getMinLevels: () => 
-      request(`${API_BASE_URL}/stocks/min-levels`, undefined, MOCK_STOCKS.filter(s => s.quantity < s.minStockLevel)),
+      request(`${API_BASE_URL}/stocks/min-levels`, undefined, MOCK_STOCKS.filter(s => s.quantity < s.minStockLevel), mapStockData),
 
     // [GET] /api/stocks/{code}
     getDetail: (code: string) => 
-      request(`${API_BASE_URL}/stocks/${code}`, undefined, MOCK_STOCKS[0]),
+      request(`${API_BASE_URL}/stocks/${code}`, undefined, MOCK_STOCKS[0], mapStockData),
     
     // [GET] /api/stocks/next-code/{prefix}
     generateNextCode: (prefix: string) => 
@@ -114,11 +145,11 @@ export const apiService = {
   },
 
   customers: {
-    getAll: () => request(`${API_BASE_URL}/customers`, undefined, []),
+    getAll: () => request(`${API_BASE_URL}/customers`, undefined, [], mapCustomerData),
   },
 
   warehouses: {
-    getAll: () => request(`${API_BASE_URL}/warehouses`, undefined, []),
+    getAll: () => request(`${API_BASE_URL}/warehouses`, undefined, [], mapWarehouseData),
     getLocations: () => request(`${API_BASE_URL}/warehouses/locations`, undefined, []),
     getCapacities: () => request(`${API_BASE_URL}/warehouses/capacities`, undefined, []),
   }

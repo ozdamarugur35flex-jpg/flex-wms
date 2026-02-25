@@ -30,8 +30,8 @@ const CustomerList: React.FC = () => {
   }, []);
 
   const filteredCustomers = customers.filter(c => 
-    c.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    c.code.toLowerCase().includes(searchTerm.toLowerCase())
+    (c.name?.toLowerCase() || '').includes(searchTerm.toLowerCase()) || 
+    (c.code?.toLowerCase() || '').includes(searchTerm.toLowerCase())
   );
 
   return (
@@ -86,16 +86,16 @@ const CustomerList: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {filteredCustomers.map((customer) => (
-                  <tr key={customer.id} className="hover:bg-indigo-50/30 transition-colors group cursor-pointer">
+                {filteredCustomers.map((customer, index) => (
+                  <tr key={customer.code || customer.id || index} className="hover:bg-indigo-50/30 transition-colors group cursor-pointer">
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
                         <div className={`w-9 h-9 rounded-lg flex items-center justify-center text-xs font-black ${customer.type === 'Alıcı' ? 'bg-sky-50 text-sky-600' : 'bg-amber-50 text-amber-600'}`}>
                           {customer.type === 'Alıcı' ? 'A' : 'S'}
                         </div>
                         <div>
-                          <p className="text-sm font-bold text-slate-800">{customer.name}</p>
-                          <p className="text-[10px] text-slate-400 font-mono font-bold uppercase">{customer.code}</p>
+                          <p className="text-sm font-bold text-slate-800">{customer.name || 'İSİMSİZ CARİ'}</p>
+                          <p className="text-[10px] text-slate-400 font-mono font-bold uppercase">{customer.code || 'KODSUZ'}</p>
                         </div>
                       </div>
                     </td>

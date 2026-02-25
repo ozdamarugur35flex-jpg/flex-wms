@@ -25,8 +25,8 @@ const WarehouseList: React.FC = () => {
   }, []);
 
   const filteredWarehouses = warehouses.filter(w => 
-    w.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    w.code.includes(searchTerm)
+    (w.name?.toLowerCase() || '').includes(searchTerm.toLowerCase()) || 
+    (w.code?.toLowerCase() || '').includes(searchTerm.toLowerCase())
   );
 
   return (
@@ -77,16 +77,16 @@ const WarehouseList: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {filteredWarehouses.map((warehouse) => (
-                  <tr key={warehouse.id} className="hover:bg-emerald-50/30 transition-colors group cursor-pointer">
+                {filteredWarehouses.map((warehouse, index) => (
+                  <tr key={warehouse.code || warehouse.id || index} className="hover:bg-emerald-50/30 transition-colors group cursor-pointer">
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center text-slate-400">
                           <Database size={20} />
                         </div>
                         <div>
-                          <p className="text-sm font-bold text-slate-800">{warehouse.name}</p>
-                          <p className="text-[10px] text-slate-400 font-mono font-bold uppercase tracking-widest">KOD: {warehouse.code}</p>
+                          <p className="text-sm font-bold text-slate-800">{warehouse.name || 'İSİMSİZ DEPO'}</p>
+                          <p className="text-[10px] text-slate-400 font-mono font-bold uppercase tracking-widest">KOD: {warehouse.code || 'KODSUZ'}</p>
                         </div>
                       </div>
                     </td>
