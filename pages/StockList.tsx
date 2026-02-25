@@ -94,8 +94,8 @@ const StockList: React.FC = () => {
   };
 
   const filteredStocks = stocks.filter(s => 
-    s.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    s.code.toLowerCase().includes(searchTerm.toLowerCase())
+    (s.name?.toLowerCase() || '').includes(searchTerm.toLowerCase()) || 
+    (s.code?.toLowerCase() || '').includes(searchTerm.toLowerCase())
   );
 
   const tabs = [
@@ -172,9 +172,9 @@ const StockList: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {filteredStocks.map((stock) => (
+                {filteredStocks.map((stock, index) => (
                   <tr 
-                    key={stock.id} 
+                    key={stock.code || stock.id || index} 
                     onClick={() => handleOpenModal(stock)}
                     className="hover:bg-indigo-50/20 transition-all group cursor-pointer"
                   >
@@ -184,24 +184,24 @@ const StockList: React.FC = () => {
                           <Database size={20} />
                         </div>
                         <div>
-                          <p className="text-sm font-black text-slate-800 leading-none mb-1 uppercase">{stock.name}</p>
-                          <p className="text-[10px] text-slate-400 font-mono font-bold uppercase">{stock.code}</p>
+                          <p className="text-sm font-black text-slate-800 leading-none mb-1 uppercase">{stock.name || 'İSİMSİZ'}</p>
+                          <p className="text-[10px] text-slate-400 font-mono font-bold uppercase">{stock.code || 'KODSUZ'}</p>
                         </div>
                       </div>
                     </td>
                     <td className="px-8 py-6 text-center">
-                      <span className="text-[10px] font-black text-slate-500 uppercase bg-slate-100 px-2 py-1 rounded border border-slate-200">{stock.unit1}</span>
+                      <span className="text-[10px] font-black text-slate-500 uppercase bg-slate-100 px-2 py-1 rounded border border-slate-200">{stock.unit1 || 'ADET'}</span>
                     </td>
                     <td className="px-8 py-6 text-center">
                       {stock.isLocked ? <Lock size={16} className="text-rose-500 mx-auto" /> : <Unlock size={16} className="text-emerald-500 mx-auto" />}
                     </td>
                     <td className="px-8 py-6 text-right">
-                       <span className={`text-lg font-black tracking-tighter ${stock.quantity < stock.minStockLevel ? 'text-rose-600' : 'text-slate-800'}`}>
-                        {stock.quantity?.toLocaleString()}
+                       <span className={`text-lg font-black tracking-tighter ${(Number(stock.quantity) || 0) < (Number(stock.minStockLevel) || 0) ? 'text-rose-600' : 'text-slate-800'}`}>
+                        {(Number(stock.quantity) || 0).toLocaleString()}
                        </span>
                     </td>
                     <td className="px-8 py-6 text-right">
-                      <span className="text-sm font-black text-emerald-600">₺{stock.lastPurchasePrice?.toFixed(2) || "0.00"}</span>
+                      <span className="text-sm font-black text-emerald-600">₺{(Number(stock.lastPurchasePrice) || 0).toFixed(2)}</span>
                     </td>
                     <td className="px-8 py-6 text-right">
                       <button className="p-2 text-slate-300 hover:text-indigo-600 transition-colors opacity-0 group-hover:opacity-100">
@@ -263,7 +263,7 @@ const StockList: React.FC = () => {
                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-1 block">Stok Kodu</label>
                         <input 
                           type="text" 
-                          value={editingStock.code}
+                          value={editingStock.code || ''}
                           onChange={(e) => setEditingStock({...editingStock, code: e.target.value})}
                           className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none focus:border-indigo-500 transition-all"
                           placeholder="Örn: H0001"
@@ -282,7 +282,7 @@ const StockList: React.FC = () => {
                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-1 block">Stok Adı</label>
                       <input 
                         type="text" 
-                        value={editingStock.name}
+                        value={editingStock.name || ''}
                         onChange={(e) => setEditingStock({...editingStock, name: e.target.value})}
                         className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none focus:border-indigo-500 transition-all"
                         placeholder="Ürün adı giriniz..."
@@ -293,7 +293,7 @@ const StockList: React.FC = () => {
                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-1 block">İngilizce İsim (STSABITEK)</label>
                       <input 
                         type="text" 
-                        value={editingStock.englishName}
+                        value={editingStock.englishName || ''}
                         onChange={(e) => setEditingStock({...editingStock, englishName: e.target.value})}
                         className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none focus:border-indigo-500 transition-all"
                         placeholder="English name..."
@@ -304,7 +304,7 @@ const StockList: React.FC = () => {
                       <div>
                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-1 block">Grup Kodu</label>
                         <select 
-                          value={editingStock.groupCode}
+                          value={editingStock.groupCode || ''}
                           onChange={(e) => setEditingStock({...editingStock, groupCode: e.target.value})}
                           className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none focus:border-indigo-500 transition-all appearance-none"
                         >
@@ -318,7 +318,7 @@ const StockList: React.FC = () => {
                       <div>
                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-1 block">Ölçü Birimi</label>
                         <select 
-                          value={editingStock.unit1}
+                          value={editingStock.unit1 || 'ADET'}
                           onChange={(e) => setEditingStock({...editingStock, unit1: e.target.value})}
                           className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none focus:border-indigo-500 transition-all appearance-none"
                         >
@@ -337,7 +337,7 @@ const StockList: React.FC = () => {
                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-1 block">Üretici Kodu</label>
                       <input 
                         type="text" 
-                        value={editingStock.producerCode}
+                        value={editingStock.producerCode || ''}
                         onChange={(e) => setEditingStock({...editingStock, producerCode: e.target.value})}
                         className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none focus:border-indigo-500 transition-all"
                       />
@@ -346,7 +346,7 @@ const StockList: React.FC = () => {
                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-1 block">Gümrük Tarife Kodu</label>
                       <input 
                         type="text" 
-                        value={editingStock.customsCode}
+                        value={editingStock.customsCode || ''}
                         onChange={(e) => setEditingStock({...editingStock, customsCode: e.target.value})}
                         className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none focus:border-indigo-500 transition-all"
                       />
@@ -386,8 +386,8 @@ const StockList: React.FC = () => {
                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-1 block">Alış KDV (%)</label>
                         <input 
                           type="number" 
-                          value={editingStock.purchaseVat}
-                          onChange={(e) => setEditingStock({...editingStock, purchaseVat: parseInt(e.target.value)})}
+                          value={editingStock.purchaseVat ?? 20}
+                          onChange={(e) => setEditingStock({...editingStock, purchaseVat: parseInt(e.target.value) || 0})}
                           className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none focus:border-indigo-500 transition-all"
                         />
                       </div>
@@ -395,8 +395,8 @@ const StockList: React.FC = () => {
                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-1 block">Satış KDV (%)</label>
                         <input 
                           type="number" 
-                          value={editingStock.salesVat}
-                          onChange={(e) => setEditingStock({...editingStock, salesVat: parseInt(e.target.value)})}
+                          value={editingStock.salesVat ?? 20}
+                          onChange={(e) => setEditingStock({...editingStock, salesVat: parseInt(e.target.value) || 0})}
                           className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none focus:border-indigo-500 transition-all"
                         />
                       </div>
@@ -408,8 +408,8 @@ const StockList: React.FC = () => {
                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-1 block">Min. Stok Seviyesi</label>
                         <input 
                           type="number" 
-                          value={editingStock.minStockLevel}
-                          onChange={(e) => setEditingStock({...editingStock, minStockLevel: parseFloat(e.target.value)})}
+                          value={editingStock.minStockLevel ?? 0}
+                          onChange={(e) => setEditingStock({...editingStock, minStockLevel: parseFloat(e.target.value) || 0})}
                           className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none focus:border-indigo-500 transition-all"
                         />
                       </div>
@@ -417,8 +417,8 @@ const StockList: React.FC = () => {
                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-1 block">Tedarik Süresi (Gün)</label>
                         <input 
                           type="number" 
-                          value={editingStock.leadTime}
-                          onChange={(e) => setEditingStock({...editingStock, leadTime: parseInt(e.target.value)})}
+                          value={editingStock.leadTime ?? 0}
+                          onChange={(e) => setEditingStock({...editingStock, leadTime: parseInt(e.target.value) || 0})}
                           className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none focus:border-indigo-500 transition-all"
                         />
                       </div>
@@ -444,7 +444,7 @@ const StockList: React.FC = () => {
                       <div className="flex items-end justify-between">
                         <div>
                           <p className="text-[10px] text-indigo-400 font-bold uppercase tracking-widest mb-1">Birim Fiyat</p>
-                          <p className="text-2xl font-black text-indigo-600 tracking-tighter">₺{editingStock.lastPurchasePrice?.toFixed(2) || "0.00"}</p>
+                          <p className="text-2xl font-black text-indigo-600 tracking-tighter">₺{(Number(editingStock.lastPurchasePrice) || 0).toFixed(2)}</p>
                         </div>
                         <div className="text-right">
                           <p className="text-[10px] text-indigo-400 font-bold uppercase tracking-widest mb-1">Son Hareket</p>
@@ -465,8 +465,8 @@ const StockList: React.FC = () => {
                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-1 block">Genişlik</label>
                         <input 
                           type="number" 
-                          value={editingStock.width}
-                          onChange={(e) => setEditingStock({...editingStock, width: parseFloat(e.target.value)})}
+                          value={editingStock.width ?? 0}
+                          onChange={(e) => setEditingStock({...editingStock, width: parseFloat(e.target.value) || 0})}
                           className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none focus:border-indigo-500 transition-all"
                         />
                       </div>
@@ -474,8 +474,8 @@ const StockList: React.FC = () => {
                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-1 block">Yükseklik</label>
                         <input 
                           type="number" 
-                          value={editingStock.height}
-                          onChange={(e) => setEditingStock({...editingStock, height: parseFloat(e.target.value)})}
+                          value={editingStock.height ?? 0}
+                          onChange={(e) => setEditingStock({...editingStock, height: parseFloat(e.target.value) || 0})}
                           className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none focus:border-indigo-500 transition-all"
                         />
                       </div>
@@ -483,8 +483,8 @@ const StockList: React.FC = () => {
                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-1 block">Derinlik</label>
                         <input 
                           type="number" 
-                          value={editingStock.depth}
-                          onChange={(e) => setEditingStock({...editingStock, depth: parseFloat(e.target.value)})}
+                          value={editingStock.depth ?? 0}
+                          onChange={(e) => setEditingStock({...editingStock, depth: parseFloat(e.target.value) || 0})}
                           className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none focus:border-indigo-500 transition-all"
                         />
                       </div>
@@ -495,7 +495,7 @@ const StockList: React.FC = () => {
                         <span className="text-[10px] font-black uppercase tracking-widest">Hesaplanan Alan</span>
                       </div>
                       <span className="text-sm font-black text-indigo-400">
-                        {((editingStock.width || 0) * (editingStock.height || 0) / 1000000).toFixed(4)} m²
+                        {((Number(editingStock.width) || 0) * (Number(editingStock.height) || 0) / 1000000).toFixed(4)} m²
                       </span>
                     </div>
                   </div>
@@ -507,7 +507,7 @@ const StockList: React.FC = () => {
                         <div className="w-16 text-[10px] font-black text-slate-400 uppercase tracking-widest">KOD {i}</div>
                         <input 
                           type="text" 
-                          value={(editingStock as any)[`kod${i}`]}
+                          value={(editingStock as any)[`kod${i}`] || ''}
                           onChange={(e) => setEditingStock({...editingStock, [`kod${i}`]: e.target.value})}
                           className="flex-1 px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:border-indigo-500 transition-all"
                           placeholder={`Özel Kod ${i}...`}
@@ -532,7 +532,7 @@ const StockList: React.FC = () => {
                         </div>
                         <input 
                           type="text" 
-                          value={(editingStock as any)[`barcode${i}`]}
+                          value={(editingStock as any)[`barcode${i}`] || ''}
                           onChange={(e) => setEditingStock({...editingStock, [`barcode${i}`]: e.target.value})}
                           className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-black outline-none focus:bg-white focus:border-indigo-500 transition-all"
                           placeholder="Barkod okutun veya girin..."

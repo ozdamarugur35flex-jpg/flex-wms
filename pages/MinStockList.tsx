@@ -33,8 +33,8 @@ const MinStockList: React.FC = () => {
 
   const filteredStocks = useMemo(() => {
     return stocks.filter(s => 
-      s.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-      s.code.toLowerCase().includes(searchTerm.toLowerCase())
+      (s.name?.toLowerCase() || '').includes(searchTerm.toLowerCase()) || 
+      (s.code?.toLowerCase() || '').includes(searchTerm.toLowerCase())
     );
   }, [stocks, searchTerm]);
 
@@ -92,17 +92,17 @@ const MinStockList: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {filteredStocks.map((stock) => (
-                <tr key={stock.id} className="hover:bg-rose-50/10 transition-colors group">
-                  <td className="px-6 py-4">
-                    <p className="text-sm font-bold text-slate-800 uppercase">{stock.name}</p>
-                    <p className="text-[10px] text-slate-400 font-mono font-bold uppercase">{stock.code}</p>
-                  </td>
-                  <td className="px-6 py-4 text-center font-black text-rose-600">{stock.quantity.toLocaleString()}</td>
-                  <td className="px-6 py-4 text-center font-black text-slate-400">{stock.minStockLevel.toLocaleString()}</td>
-                  <td className="px-6 py-4 text-right"><MoreHorizontal size={18} className="text-slate-300" /></td>
-                </tr>
-              ))}
+                {filteredStocks.map((stock, index) => (
+                  <tr key={stock.code || stock.id || index} className="hover:bg-rose-50/10 transition-colors group">
+                    <td className="px-6 py-4">
+                      <p className="text-sm font-bold text-slate-800 uppercase">{stock.name || 'İSİMSİZ'}</p>
+                      <p className="text-[10px] text-slate-400 font-mono font-bold uppercase">{stock.code || 'KODSUZ'}</p>
+                    </td>
+                    <td className="px-6 py-4 text-center font-black text-rose-600">{(Number(stock.quantity) || 0).toLocaleString()}</td>
+                    <td className="px-6 py-4 text-center font-black text-slate-400">{(Number(stock.minStockLevel) || 0).toLocaleString()}</td>
+                    <td className="px-6 py-4 text-right"><MoreHorizontal size={18} className="text-slate-300" /></td>
+                  </tr>
+                ))}
             </tbody>
           </table>
         )}
