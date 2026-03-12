@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   FileUp, 
   Plus, 
@@ -27,39 +27,33 @@ import {
   Globe,
   AlertTriangle,
   Hash,
-  Briefcase
+  Briefcase,
+  Loader2
 } from 'lucide-react';
-import { SalesInvoice, InvoiceItem } from '../types';
-
-// Mock database for VAT and Project codes
-const stockDb = [
-  { code: 'AL-2020', name: 'Alüminyum Profil 20x20', vat: 20 },
-  { code: 'SMN-M8', name: 'Çelik Somun M8', vat: 10 },
-  { code: 'PL-3030', name: 'Plastik Kapak 30x30', vat: 20 },
-];
-
-const projectCodes = ['PRO-2024-X1', 'PRO-2024-Y2', 'PRO-MAKINE-01', 'PRO-STOK-DEVIR'];
-
-const mockItems: InvoiceItem[] = [
-  { id: '1', stockCode: 'AL-2020', stockName: 'Alüminyum Profil 20x20', loadingDate: '2024-03-25', deliveryDate: '2024-03-25', conversion: 1, quantity: 1200, currencyType: 'TRY', currencyPrice: 45.5, exchangeRate: 1, warehouseCode: '01', price: 45.5, vat: 20, total: 54600, orderNo: 'SİP-9901', orderLineNo: 1 },
-];
+import { SalesInvoice, InvoiceItem, StockCard, CustomerCard } from '../types';
+import { apiService } from '../api';
 
 const SalesInvoicePage: React.FC = () => {
   const today = new Date().toISOString().split('T')[0];
   const [activeTab, setActiveTab] = useState<'header' | 'lines'>('header');
   const [isPreviewMode, setIsPreviewMode] = useState(false);
-  const [items, setItems] = useState<InvoiceItem[]>(mockItems);
+  const [items, setItems] = useState<InvoiceItem[]>([]);
+  const [stocks, setStocks] = useState<StockCard[]>([]);
+  const [customers, setCustomers] = useState<CustomerCard[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   
   // Header State
-  const [invoiceHeader, setInvoiceHeader] = useState({
+  const [invoiceHeader, setInvoiceHeader] = useState<Partial<SalesInvoice>>({
     invoiceNo: '',
     date: today,
     deliveryDate: today,
-    customerName: 'Aksoy Lojistik Tic. Ltd. Şti.',
+    customerCode: '',
+    customerName: '',
     projectCode: 'PRO-2024-X1',
-    taxOffice: 'Maslak V.D.',
-    taxNumber: '1234567890',
-    address: 'İkitelli OSB, Metal İş San. Sit. 12. Blok No: 45 Başakşehir/İstanbul',
+    taxOffice: '',
+    taxNumber: '',
+    address: '',
     description: ''
   });
 
@@ -72,23 +66,117 @@ const SalesInvoicePage: React.FC = () => {
     vat: 20
   });
 
-  // Edit Lock Rule
-  const canEdit = invoiceHeader.date === today;
+  const projectCodes = ['PRO-2024-X1', 'PRO-2024-Y2', 'PRO-MAKINE-01', 'PRO-STOK-DEVIR'];
+
+  useEffect(() => {
+    const fetchData = async () => {
+      setIsLoading(true);
+      try {
+        const [stockList, customerList, nextNo] = await Promise.all([
+          apiService.stocks.getAll(),
+          apiService.customers.getAll(),
+          apiService.salesInvoices.generateNextNo()
+        ]);
+        setStocks(stockList);
+        setCustomers(customerList);
+        if (nextNo && nextNo.nextNo) {
+          setInvoiceHeader(prev => ({ ...prev, invoiceNo: nextNo.nextNo }));
+        }
+      } catch (error) {
+        console.error('Data fetch error:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchData();
+  }, []);
+
+  const handleCustomerChange = (code: string) => {
+    const customer = customers.find(c => c.code === code);
+    if (customer) {
+      setInvoiceHeader(prev => ({
+        ...prev,
+        customerCode: code,
+        customerName: customer.name,
+        taxOffice: customer.taxOffice || '',
+        taxNumber: customer.taxNumber || '',
+        address: `${customer.name} - ${customer.phone || ''}`
+      }));
+    }
+  };
+
+  const handleStockChange = (code: string) => {
+    const stock = stocks.find(s => s.code === code);
+    setLineEntry(prev => ({
+      ...prev,
+      stockCode: code,
+      vat: stock ? stock.salesVat : 20,
+      price: stock ? (stock.salesPrices?.[0] || 0) : 0
+    }));
+  };
+
+  const handleAddLine = () => {
+    if (!lineEntry.stockCode || lineEntry.qty <= 0) return;
+    
+    const stock = stocks.find(s => s.code === lineEntry.stockCode);
+    const newItem: InvoiceItem = {
+      id: Math.random().toString(36).substr(2, 9),
+      stockCode: lineEntry.stockCode,
+      stockName: stock?.name || '',
+      loadingDate: invoiceHeader.date!,
+      deliveryDate: invoiceHeader.deliveryDate!,
+      conversion: 1,
+      quantity: lineEntry.qty,
+      currencyType: 'TRY',
+      currencyPrice: lineEntry.price,
+      exchangeRate: 1,
+      warehouseCode: lineEntry.warehouse,
+      price: lineEntry.price,
+      vat: lineEntry.vat,
+      total: lineEntry.qty * lineEntry.price * (1 + lineEntry.vat / 100)
+    };
+
+    setItems(prev => [...prev, newItem]);
+    setLineEntry({
+      stockCode: '',
+      warehouse: '01',
+      qty: 0,
+      price: 0,
+      vat: 20
+    });
+  };
+
+  const handleSave = async () => {
+    if (!invoiceHeader.invoiceNo || !invoiceHeader.customerCode || items.length === 0) {
+      alert('Lütfen zorunlu alanları doldurunuz ve en az bir kalem ekleyiniz.');
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const dataToSave = {
+        ...invoiceHeader,
+        items,
+        totalAmount: totals.grandTotal
+      };
+      const result = await apiService.salesInvoices.save(dataToSave);
+      if (result.success) {
+        alert('İrsaliye başarıyla Netsis taslaklarına kaydedildi.');
+        // Reset or redirect
+      }
+    } catch (error) {
+      console.error('Save error:', error);
+      alert('Kaydedilirken bir hata oluştu.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   const handleDateChange = (val: string) => {
     setInvoiceHeader(prev => ({
       ...prev,
       date: val,
-      deliveryDate: val // Rule: Delivery date follows Invoice date
-    }));
-  };
-
-  const handleStockChange = (code: string) => {
-    const stock = stockDb.find(s => s.code === code);
-    setLineEntry(prev => ({
-      ...prev,
-      stockCode: code,
-      vat: stock ? stock.vat : 20 // Rule: VAT from Stock Card
+      deliveryDate: val
     }));
   };
 
@@ -97,6 +185,16 @@ const SalesInvoicePage: React.FC = () => {
     const vatTotal = items.reduce((acc, curr) => acc + ((curr.price * curr.quantity) * curr.vat / 100), 0);
     return { subTotal, vatTotal, grandTotal: subTotal + vatTotal };
   }, [items]);
+
+  const canEdit = invoiceHeader.date === today;
+
+  if (isLoading) {
+    return (
+      <div className="h-full flex items-center justify-center">
+        <Loader2 className="animate-spin text-indigo-600" size={48} />
+      </div>
+    );
+  }
 
   if (isPreviewMode) {
     return (
@@ -191,11 +289,32 @@ const SalesInvoicePage: React.FC = () => {
         <div className="flex items-center gap-2">
           {canEdit && (
             <>
-              <button className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-600 rounded-xl text-xs font-bold hover:bg-slate-50 active:scale-95 transition-all">
+              <button 
+                onClick={() => {
+                  setInvoiceHeader({
+                    invoiceNo: '',
+                    date: today,
+                    deliveryDate: today,
+                    customerCode: '',
+                    customerName: '',
+                    projectCode: 'PRO-2024-X1',
+                    taxOffice: '',
+                    taxNumber: '',
+                    address: '',
+                    description: ''
+                  });
+                  setItems([]);
+                }}
+                className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-600 rounded-xl text-xs font-bold hover:bg-slate-50 active:scale-95 transition-all"
+              >
                 <Plus size={16} className="text-indigo-600" /> Yeni
               </button>
-              <button className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-black shadow-lg shadow-indigo-100 hover:bg-indigo-700 active:scale-95 transition-all">
-                <Save size={16} /> Kaydet
+              <button 
+                onClick={handleSave}
+                disabled={isSaving}
+                className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-black shadow-lg shadow-indigo-100 hover:bg-indigo-700 active:scale-95 transition-all disabled:opacity-50"
+              >
+                {isSaving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />} Kaydet
               </button>
             </>
           )}
@@ -296,6 +415,21 @@ const SalesInvoicePage: React.FC = () => {
 
                    <div className="md:col-span-2 space-y-2">
                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-2">
+                         <User size={14} className="text-indigo-500" /> Müşteri Seçimi
+                      </label>
+                      <select 
+                        disabled={!canEdit}
+                        className="w-full px-5 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none focus:border-indigo-500"
+                        value={invoiceHeader.customerCode}
+                        onChange={(e) => handleCustomerChange(e.target.value)}
+                      >
+                         <option value="">Müşteri Seçiniz...</option>
+                         {customers.map(c => <option key={c.code} value={c.code}>{c.code} | {c.name}</option>)}
+                      </select>
+                   </div>
+
+                   <div className="md:col-span-2 space-y-2">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-2">
                          <Briefcase size={14} className="text-indigo-500" /> Proje Kodu Seçimi
                       </label>
                       <select 
@@ -382,7 +516,7 @@ const SalesInvoicePage: React.FC = () => {
                       onChange={(e) => handleStockChange(e.target.value)}
                     >
                        <option value="" className="text-slate-900">Seçiniz...</option>
-                       {stockDb.map(s => <option key={s.code} value={s.code} className="text-slate-900">{s.code} | {s.name}</option>)}
+                       {stocks.map(s => <option key={s.code} value={s.code} className="text-slate-900">{s.code} | {s.name}</option>)}
                     </select>
                  </div>
 
@@ -412,6 +546,7 @@ const SalesInvoicePage: React.FC = () => {
 
                  <div className="lg:col-span-3 space-y-2">
                     <button 
+                      onClick={handleAddLine}
                       disabled={!canEdit || !lineEntry.stockCode || lineEntry.qty <= 0}
                       className="w-full bg-indigo-500 hover:bg-indigo-600 text-white py-4 rounded-[1.5rem] text-xs font-black uppercase tracking-[0.2em] shadow-xl shadow-indigo-500/20 active:scale-95 transition-all flex items-center justify-center gap-3 disabled:opacity-30 disabled:cursor-not-allowed"
                     >
@@ -469,7 +604,14 @@ const SalesInvoicePage: React.FC = () => {
                                 <p className="text-sm font-black text-indigo-700">₺{item.total.toLocaleString(undefined, {minimumFractionDigits: 2})}</p>
                              </td>
                              <td className="px-6 py-4 text-right">
-                                {canEdit && <button className="p-2 text-slate-300 hover:text-rose-500 transition-colors opacity-0 group-hover:opacity-100"><Trash2 size={16} /></button>}
+                                {canEdit && (
+                                  <button 
+                                    onClick={() => setItems(items.filter(i => i.id !== item.id))}
+                                    className="p-2 text-slate-300 hover:text-rose-500 transition-colors opacity-0 group-hover:opacity-100"
+                                  >
+                                    <Trash2 size={16} />
+                                  </button>
+                                )}
                              </td>
                           </tr>
                        ))}

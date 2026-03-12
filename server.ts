@@ -40,6 +40,55 @@ async function startServer() {
     }
   ];
 
+  let variants: any[] = [
+    {
+      id: 'V1',
+      stockCode: 'AL-2020',
+      stockName: 'Alüminyum Profil 20x20',
+      variantCode: 'AL-2020-BLK',
+      variantName: 'Siyah Eloksal',
+      color: 'Siyah',
+      size: '20x20',
+      barcode: 'VAR-001',
+      createdAt: new Date().toISOString()
+    }
+  ];
+
+  let materialOrderTracking: any[] = [
+    {
+      id: 'MOT1',
+      orderNo: 'SIP-00124',
+      stockCode: 'AL-2020',
+      stockName: 'Alüminyum Profil 20x20',
+      supplierCode: 'C001',
+      supplierName: 'Aksoy Metal Ltd.',
+      orderDate: '2024-03-01',
+      orderedQuantity: 1000,
+      receivedQuantity: 600,
+      remainingQuantity: 400,
+      unit: 'ADET',
+      status: 'Kısmi',
+      lastDeliveryDate: '2024-03-10',
+      lastWaybillNo: 'IRS-9988'
+    },
+    {
+      id: 'MOT2',
+      orderNo: 'SIP-00125',
+      stockCode: 'AL-2020',
+      stockName: 'Alüminyum Profil 20x20',
+      supplierCode: 'C002',
+      supplierName: 'Global Trading Co.',
+      orderDate: '2024-03-05',
+      orderedQuantity: 500,
+      receivedQuantity: 500,
+      remainingQuantity: 0,
+      unit: 'ADET',
+      status: 'Kapalı',
+      lastDeliveryDate: '2024-03-11',
+      lastWaybillNo: 'IRS-9990'
+    }
+  ];
+
   // --- API ROUTES ---
 
   // [GET] /api/stocks
@@ -151,6 +200,171 @@ async function startServer() {
     res.json([
       { id: 'CP1', warehouseCode: '01', stockGroupCode: 'HAMMADDE', maxCapacity: 10000, currentQuantity: 4500, unit: 'ADET', warningThreshold: 80 }
     ]);
+  });
+
+  // --- VARIANT API ---
+
+  // [GET] /api/variants
+  app.get("/api/variants", (req, res) => {
+    res.json(variants);
+  });
+
+  // [POST] /api/variants
+  app.post("/api/variants", (req, res) => {
+    const data = req.body;
+    const stock = stocks.find(s => s.code === data.stockCode);
+    
+    const newVariant = {
+      ...data,
+      id: Math.random().toString(36).substr(2, 9),
+      stockName: stock ? stock.name : 'Bilinmeyen Stok',
+      createdAt: new Date().toISOString()
+    };
+    
+    variants.push(newVariant);
+    res.json({ success: true, variant: newVariant });
+  });
+
+  // [DELETE] /api/variants/:id
+  app.delete("/api/variants/:id", (req, res) => {
+    variants = variants.filter(v => v.id !== req.params.id);
+    res.json({ success: true });
+  });
+
+  // --- MATERIAL ORDER TRACKING API ---
+
+  // [GET] /api/material-order-tracking
+  app.get("/api/material-order-tracking", (req, res) => {
+    res.json(materialOrderTracking);
+  });
+
+  // --- CUSTOMER ORDER INTEGRATION API ---
+
+  // [GET] /api/customer-orders/:orderNo
+  app.get("/api/customer-orders/:orderNo", (req, res) => {
+    const { orderNo } = req.params;
+    
+    // TBLSIPAMAS & TBLCASAB & TBLCAHAR Simülasyonu
+    const orderHeader = {
+      id: 'CO1',
+      orderNo: orderNo,
+      date: '2024-03-12',
+      customerCode: 'C001',
+      customerName: 'Aksoy Metal Ltd.',
+      deliveryDate: '2024-03-20',
+      orderType: 'Yurt İçi',
+      totalAmount: 150000,
+      riskStatus: {
+        limit: 500000,
+        balance: 125000,
+        netRisk: 375000,
+        checkRisk: 50000
+      },
+      extraFields: {
+        EKALAN1: 'Özel Not 1',
+        EKALAN2: 'Sevkiyat Önceliği: Yüksek',
+        // ... 16'ya kadar
+      }
+    };
+
+    res.json(orderHeader);
+  });
+
+  // [GET] /api/customer-orders/:orderNo/items
+  app.get("/api/customer-orders/:orderNo/items", (req, res) => {
+    // TBLSIPATRA & TBLSTSAB Simülasyonu
+    const items = [
+      {
+        id: 'ITM1',
+        stockCode: 'AL-2020',
+        stockName: 'Alüminyum Profil 20x20',
+        quantity: 500,
+        price: 120.50,
+        vatRate: 20,
+        total: 60250,
+        deliveryDate: '2024-03-20'
+      },
+      {
+        id: 'ITM2',
+        stockCode: 'SMN-M8',
+        stockName: 'Çelik Somun M8',
+        quantity: 2000,
+        price: 2.50,
+        vatRate: 20,
+        total: 5000,
+        deliveryDate: '2024-03-22'
+      }
+    ];
+    res.json(items);
+  });
+
+  // [GET] /api/stocks/:code/analysis
+  app.get("/api/stocks/:code/analysis", (req, res) => {
+    const { code } = req.params;
+    const { customerCode } = req.query;
+    
+    // TBLSTHAR (HTUR='J') Simülasyonu
+    res.json({
+      pastPrices: [
+        { date: '2024-01-15', price: 115.00 },
+        { date: '2024-02-01', price: 118.50 },
+        { date: '2024-02-20', price: 120.00 },
+        { date: '2024-03-05', price: 120.50 }
+      ]
+    });
+  });
+
+  // [GET] /api/stocks/:code/order-balance
+  app.get("/api/stocks/:code/order-balance", (req, res) => {
+    // TBLSTOKURS & TBLSIPATRA (KAPAL='A') Simülasyonu
+    res.json({
+      warehouseBalance: 1500,
+      reservedOrders: 850, // FTIP=1
+      futureOrders: 300    // FTIP=2
+    });
+  });
+
+  // [GET] /api/customers/:code/sales-history
+  app.get("/api/customers/:code/sales-history", (req, res) => {
+    // TBLSTHAR (HTUR='J') Simülasyonu
+    res.json([
+      { stockCode: 'AL-2020', stockName: 'Alüminyum Profil 20x20', totalQty: 5000, lastPrice: 120.50, lastDate: '2024-03-05' },
+      { stockCode: 'SMN-M8', stockName: 'Çelik Somun M8', totalQty: 15000, lastPrice: 2.45, lastDate: '2024-02-28' }
+    ]);
+  });
+
+  // --- SALES INVOICE API ---
+  let salesInvoices: any[] = [
+    {
+      id: 'IRS2024000000001',
+      invoiceNo: 'IRS2024000000001',
+      customerCode: 'C001',
+      customerName: 'Aksoy Lojistik Tic. Ltd. Şti.',
+      date: '2024-03-12',
+      deliveryDate: '2024-03-12',
+      totalAmount: 54600,
+      projectCode: 'PRO-2024-X1',
+      description: 'EIR Serisi: ABC2024',
+      taxOffice: 'Maslak V.D.',
+      taxNumber: '1234567890',
+      address: 'İkitelli OSB, Metal İş San. Sit. 12. Blok No: 45 Başakşehir/İstanbul',
+      items: [
+        { id: '1', stockCode: 'AL-2020', stockName: 'Alüminyum Profil 20x20', quantity: 1200, price: 45.5, vat: 20, total: 54600, warehouseCode: '01' }
+      ]
+    }
+  ];
+
+  app.get("/api/salesinvoices", (req, res) => res.json(salesInvoices));
+  app.get("/api/salesinvoices/next-no", (req, res) => res.json({ nextNo: 'IRS2026000000001' }));
+  app.get("/api/salesinvoices/:invoiceNo", (req, res) => {
+    const inv = salesInvoices.find(i => i.invoiceNo === req.params.invoiceNo);
+    if (inv) res.json(inv);
+    else res.status(404).json({ message: "İrsaliye bulunamadı" });
+  });
+  app.post("/api/salesinvoices", (req, res) => {
+    const data = req.body;
+    salesInvoices.push({ ...data, id: data.invoiceNo });
+    res.json({ success: true, message: "Satış irsaliyesi Netsis'e (Sim) taslak olarak kaydedildi." });
   });
 
   // Vite middleware for development

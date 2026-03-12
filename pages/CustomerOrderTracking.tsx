@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   ClipboardList, 
   RotateCcw, 
@@ -25,31 +25,37 @@ import {
   LayoutGrid,
   Zap,
   TrendingUp,
-  Info
+  Info,
+  Loader2
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
-// Fix: Removed JobOrder which is not defined in types.ts
-import { CustomerOrderTracking as ITracking } from '../types';
-
-const mockTrackingData: ITracking[] = [
-  { id: '1', planRowNo: 1, hasTooling: true, customerCode: 'C-001', customerName: 'Aksoy Lojistik Tic.', orderStatus: 'Üretimde', stockCode: 'AL-2020', stockName: 'Alüminyum Profil 20x20', orderQty: 1000, deliveredQty: 300, balance: 700, orderNo: 'SİP-2024-001', orderType: 'Kesin', deliveryDate: '2024-03-20', initialDeliveryDate: '2024-03-15', notes: 'Özel kesim yapılacak', priceTL: 45.5, priceCurrency: 1.4, currencyType: 'USD', productionQty: 450, isRework: false, unit: 'ADET', totalAmountTL: 45500 },
-  { id: '2', planRowNo: 2, hasTooling: false, customerCode: 'C-002', customerName: 'Yılmaz Metal A.Ş.', orderStatus: 'Beklemede', stockCode: 'SMN-M8', stockName: 'Çelik Somun M8', orderQty: 5000, deliveredQty: 0, balance: 5000, orderNo: 'SİP-2024-002', orderType: 'Kesin', deliveryDate: '2024-03-26', initialDeliveryDate: '2024-03-26', notes: '', priceTL: 1.2, priceCurrency: 1.2, currencyType: 'TRY', productionQty: 0, isRework: true, unit: 'ADET', totalAmountTL: 6000 },
-];
+import { apiService } from '../api';
 
 const CustomerOrderTracking: React.FC = () => {
-  const [data, setData] = useState<ITracking[]>(mockTrackingData);
+  const [data, setData] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [orderTypeFilter, setOrderTypeFilter] = useState<'Tümü' | 'Kesin' | 'Plan'>('Tümü');
+
+  const fetchData = async () => {
+    setLoading(true);
+    const result = await apiService.customerOrders.getStatusReport();
+    setData(result);
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, []);
 
   const filteredData = useMemo(() => {
     return data.filter(item => {
-      const matchSearch = item.customerName.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                          item.orderNo.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          item.stockName.toLowerCase().includes(searchTerm.toLowerCase());
-      const matchType = orderTypeFilter === 'Tümü' || item.orderType === orderTypeFilter;
-      return matchSearch && matchType;
+      const matchSearch = (item.musteriAdi || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
+                          (item.siparisNo || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          (item.stokAdi || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          (item.stokKodu || '').toLowerCase().includes(searchTerm.toLowerCase());
+      return matchSearch;
     });
-  }, [data, searchTerm, orderTypeFilter]);
+  }, [data, searchTerm]);
 
   const handleExportExcel = () => {
     const worksheet = XLSX.utils.json_to_sheet(filteredData);
@@ -70,7 +76,12 @@ const CustomerOrderTracking: React.FC = () => {
         </div>
         
         <div className="flex items-center gap-2">
-          <button className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-600 rounded-xl text-xs font-bold hover:bg-slate-50 transition-all active:scale-95"><RotateCcw size={16} /> Listele</button>
+          <button 
+            onClick={fetchData}
+            className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-600 rounded-xl text-xs font-bold hover:bg-slate-50 transition-all active:scale-95"
+          >
+            {loading ? <Loader2 size={16} className="animate-spin" /> : <RotateCcw size={16} />} Yenile
+          </button>
           <button 
             onClick={handleExportExcel}
             className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-600 rounded-xl text-xs font-bold hover:bg-slate-50 transition-all active:scale-95"
@@ -90,21 +101,54 @@ const CustomerOrderTracking: React.FC = () => {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-slate-50/50 border-b border-slate-200">
-                <th className="px-6 py-5 text-[11px] font-black text-slate-400 uppercase tracking-widest">Sipariş / Müşteri</th>
-                <th className="px-6 py-5 text-[11px] font-black text-slate-400 uppercase tracking-widest text-center">Miktar</th>
-                <th className="px-6 py-5 text-[11px] font-black text-slate-400 uppercase tracking-widest text-center">Üretim / Sevk</th>
-                <th className="px-6 py-5 text-right">Tutar</th>
+                <th className="px-6 py-5 text-[11px] font-black text-slate-400 uppercase tracking-widest">Sipariş No / Tarih</th>
+                <th className="px-6 py-5 text-[11px] font-black text-slate-400 uppercase tracking-widest">Müşteri / Stok</th>
+                <th className="px-6 py-5 text-[11px] font-black text-slate-400 uppercase tracking-widest text-center">Sipariş</th>
+                <th className="px-6 py-5 text-[11px] font-black text-slate-400 uppercase tracking-widest text-center">Sevk</th>
+                <th className="px-6 py-5 text-[11px] font-black text-slate-400 uppercase tracking-widest text-center">Bakiye</th>
+                <th className="px-6 py-5 text-right">Durum</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {filteredData.map((item) => (
-                <tr key={item.id} className="hover:bg-indigo-50/20 transition-all group">
-                   <td className="px-6 py-4 font-black text-slate-800">{item.customerName} <span className="text-[10px] text-slate-400 ml-2">{item.orderNo}</span></td>
-                   <td className="px-6 py-4 text-center font-black text-slate-700">{item.orderQty}</td>
-                   <td className="px-6 py-4 text-center font-black text-emerald-600">{item.productionQty} / {item.deliveredQty}</td>
-                   <td className="px-6 py-4 text-right font-black text-indigo-600">₺{item.totalAmountTL.toLocaleString()}</td>
+              {loading ? (
+                <tr>
+                  <td colSpan={6} className="py-20 text-center">
+                    <div className="flex flex-col items-center gap-4">
+                      <Loader2 size={40} className="text-indigo-600 animate-spin" />
+                      <p className="text-xs font-black uppercase tracking-widest text-slate-400">Veriler Yükleniyor...</p>
+                    </div>
+                  </td>
+                </tr>
+              ) : filteredData.map((item, idx) => (
+                <tr key={idx} className="hover:bg-indigo-50/20 transition-all group">
+                   <td className="px-6 py-4">
+                      <p className="font-black text-slate-800">{item.siparisNo}</p>
+                      <p className="text-[10px] text-slate-400 font-bold">{new Date(item.siparisTarihi).toLocaleDateString()}</p>
+                   </td>
+                   <td className="px-6 py-4">
+                      <p className="text-xs font-black text-slate-700 uppercase">{item.musteriAdi}</p>
+                      <p className="text-[10px] text-indigo-600 font-mono mt-1">{item.stokKodu} - {item.stokAdi}</p>
+                   </td>
+                   <td className="px-6 py-4 text-center font-black text-slate-700">{item.siparisMiktari.toLocaleString()}</td>
+                   <td className="px-6 py-4 text-center font-black text-emerald-600">{item.sevkEdilenMiktar.toLocaleString()}</td>
+                   <td className="px-6 py-4 text-center font-black text-rose-600">{item.bakiyeMiktar.toLocaleString()}</td>
+                   <td className="px-6 py-4 text-right">
+                      <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full border text-[9px] font-black uppercase ${item.kapaliMi ? 'bg-slate-100 text-slate-500 border-slate-200' : item.bakiyeMiktar <= 0 ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-amber-50 text-amber-600 border-amber-100'}`}>
+                        {item.kapaliMi ? 'Kapalı' : item.bakiyeMiktar <= 0 ? 'Tamamlandı' : 'Açık'}
+                      </div>
+                   </td>
                 </tr>
               ))}
+              {!loading && filteredData.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="py-20 text-center">
+                    <div className="flex flex-col items-center gap-4 opacity-20">
+                      <ClipboardList size={48} />
+                      <p className="text-xs font-black uppercase tracking-widest">Kayıt Bulunamadı</p>
+                    </div>
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>

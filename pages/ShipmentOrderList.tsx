@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   ClipboardList, 
   RotateCcw, 
@@ -19,31 +19,39 @@ import {
   BadgeAlert,
   Smartphone,
   Eye,
-  ArrowRightCircle
+  ArrowRightCircle,
+  Loader2
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { ShipmentOrderItem } from '../types';
-
-const mockShipmentOrders: ShipmentOrderItem[] = [
-  { id: '1', orderNo: 'SİP-9001', stockCode: 'AL-2020', stockName: 'Alüminyum Profil 20x20', customerName: 'Aksoy Metal Sanayi', branchName: 'Merkez', orderedQty: 1000, shippedQty: 1000, unit: 'ADET', status: 'Tamamlandı', terminalStatus: 'Aktarıldı', date: '2024-03-20' },
-  { id: '2', orderNo: 'SİP-9002', stockCode: 'SMN-M8', stockName: 'Çelik Somun M8', customerName: 'Yılmaz Lojistik A.Ş.', branchName: 'Fabrika-1', orderedQty: 5000, shippedQty: 3200, unit: 'ADET', status: 'Kısmi Sevk', terminalStatus: 'Aktarıldı', date: '2024-03-21' },
-  { id: '3', orderNo: 'SİP-9003', stockCode: 'PL-3030', stockName: 'Plastik Kapak 30x30', customerName: 'Global Export Ltd.', branchName: 'Fabrika-1', orderedQty: 250, shippedQty: 0, unit: 'ADET', status: 'Beklemede', terminalStatus: 'Aktarıldı', date: '2024-03-21' },
-  { id: '4', orderNo: 'SİP-9004', stockCode: 'AL-2020', stockName: 'Alüminyum Profil 20x20', customerName: 'Global Export Ltd.', branchName: 'Lojistik Depo', orderedQty: 800, shippedQty: 0, unit: 'ADET', status: 'Beklemede', terminalStatus: 'Bekliyor', date: '2024-03-21' },
-];
+import { apiService } from '../api';
 
 const ShipmentOrderList: React.FC = () => {
+  const [data, setData] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [showCompleted, setShowCompleted] = useState(false);
 
+  const fetchData = async () => {
+    setLoading(true);
+    const result = await apiService.shipmentOrders.getAll();
+    setData(result);
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
   const filteredData = useMemo(() => {
-    return mockShipmentOrders.filter(item => {
-      const matchSearch = item.stockName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          item.orderNo.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          item.customerName.toLowerCase().includes(searchTerm.toLowerCase());
-      const matchCompleted = showCompleted ? true : item.status !== 'Tamamlandı';
+    return data.filter(item => {
+      const matchSearch = (item.stokAdi || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          (item.sevkEmriNo || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          (item.cariIsim || '').toLowerCase().includes(searchTerm.toLowerCase());
+      const matchCompleted = showCompleted ? true : item.durum !== 'T';
       return matchSearch && matchCompleted;
     });
-  }, [searchTerm, showCompleted]);
+  }, [data, searchTerm, showCompleted]);
 
   const handleExportExcel = () => {
     const worksheet = XLSX.utils.json_to_sheet(filteredData);
@@ -66,8 +74,11 @@ const ShipmentOrderList: React.FC = () => {
         </div>
         
         <div className="flex items-center gap-2">
-          <button className="flex items-center gap-2 px-4 py-2.5 bg-indigo-50 text-indigo-600 rounded-xl text-xs font-black hover:bg-indigo-100 transition-all active:scale-95">
-            <RotateCcw size={16} /> Yenile
+          <button 
+            onClick={fetchData}
+            className="flex items-center gap-2 px-4 py-2.5 bg-indigo-50 text-indigo-600 rounded-xl text-xs font-black hover:bg-indigo-100 transition-all active:scale-95"
+          >
+            {loading ? <Loader2 size={16} className="animate-spin" /> : <RotateCcw size={16} />} Yenile
           </button>
           <button 
             onClick={handleExportExcel}
@@ -85,7 +96,7 @@ const ShipmentOrderList: React.FC = () => {
             </div>
             <div>
                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Bekleyen Sevk</p>
-               <h4 className="text-xl font-black text-slate-800">{mockShipmentOrders.filter(o => o.status !== 'Tamamlandı').length} EMİR</h4>
+               <h4 className="text-xl font-black text-slate-800">{data.filter(o => o.durum !== 'T').length} EMİR</h4>
             </div>
          </div>
          <div className="bg-slate-900 p-5 rounded-[2rem] text-white flex items-center justify-between group cursor-pointer" onClick={() => setShowCompleted(!showCompleted)}>
@@ -117,36 +128,42 @@ const ShipmentOrderList: React.FC = () => {
             <table className="w-full text-left border-collapse min-w-[1400px]">
                <thead className="sticky top-0 z-10 bg-slate-900 text-white text-[10px] font-black uppercase tracking-[0.2em]">
                   <tr>
-                     <th className="px-8 py-5 border-r border-white/5">Şube / Tarih</th>
-                     <th className="px-8 py-5 border-r border-white/5">Sevk Emri / Müşteri</th>
+                     <th className="px-8 py-5 border-r border-white/5">Sevk Emri No</th>
+                     <th className="px-8 py-5 border-r border-white/5">Müşteri</th>
                      <th className="px-8 py-5 border-r border-white/5">Stok Bilgisi</th>
-                     <th className="px-8 py-5 border-r border-white/5 text-center">Planlanan</th>
-                     <th className="px-8 py-5 border-r border-white/5 text-center">Sevk Edilen</th>
+                     <th className="px-8 py-5 border-r border-white/5 text-center">Miktar</th>
+                     <th className="px-8 py-5 border-r border-white/5 text-center">Depo</th>
                      <th className="px-8 py-5 border-r border-white/5 text-center">Durum</th>
                      <th className="px-8 py-5 text-right"></th>
                   </tr>
                </thead>
                <tbody className="divide-y divide-slate-100">
-                  {filteredData.map((item) => (
-                    <tr key={item.id} className={`hover:bg-indigo-50/10 transition-all group ${item.status === 'Tamamlandı' ? 'bg-emerald-50/30' : ''}`}>
+                  {loading ? (
+                    <tr>
+                      <td colSpan={7} className="py-20 text-center">
+                        <div className="flex flex-col items-center gap-4">
+                          <Loader2 size={40} className="text-indigo-600 animate-spin" />
+                          <p className="text-xs font-black uppercase tracking-widest text-slate-400">Veriler Yükleniyor...</p>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : filteredData.map((item) => (
+                    <tr key={item.id} className={`hover:bg-indigo-50/10 transition-all group ${item.durum === 'T' ? 'bg-emerald-50/30' : ''}`}>
                         <td className="px-8 py-5">
-                            <p className="text-xs font-black text-slate-800 uppercase tracking-tight">{item.branchName}</p>
-                            <p className="text-[10px] text-slate-400 font-bold mt-1">{item.date}</p>
+                            <p className="text-xs font-black text-indigo-600 font-mono tracking-widest">{item.sevkEmriNo}</p>
                         </td>
                         <td className="px-8 py-5">
-                            <div className="flex items-center gap-3">
-                                <p className="text-xs font-black text-indigo-600 font-mono tracking-widest">{item.orderNo}</p>
-                                <p className="text-[10px] font-black text-slate-600 uppercase leading-tight line-clamp-1">{item.customerName}</p>
-                            </div>
+                            <p className="text-[10px] font-black text-slate-600 uppercase leading-tight">{item.cariIsim}</p>
                         </td>
                         <td className="px-8 py-5">
-                            <p className="text-xs font-bold text-slate-700 uppercase">{item.stockName}</p>
+                            <p className="text-xs font-bold text-slate-700 uppercase">{item.stokAdi}</p>
+                            <p className="text-[10px] text-slate-400 font-mono">{item.stokKodu}</p>
                         </td>
-                        <td className="px-8 py-5 text-center font-black text-slate-800">{item.orderedQty.toLocaleString()}</td>
-                        <td className="px-8 py-5 text-center font-black text-emerald-600">{item.shippedQty.toLocaleString()}</td>
+                        <td className="px-8 py-5 text-center font-black text-slate-800">{item.miktar.toLocaleString()}</td>
+                        <td className="px-8 py-5 text-center font-black text-slate-500">{item.depo}</td>
                         <td className="px-8 py-5 text-center">
-                            <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full border text-[9px] font-black uppercase ${item.status === 'Tamamlandı' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-amber-50 text-amber-600 border-amber-100'}`}>
-                                {item.status}
+                            <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full border text-[9px] font-black uppercase ${item.durum === 'T' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-amber-50 text-amber-600 border-amber-100'}`}>
+                                {item.durum === 'T' ? 'Tamamlandı' : item.durum === 'B' ? 'Beklemede' : 'İptal'}
                             </div>
                         </td>
                         <td className="px-8 py-5 text-right">
@@ -154,6 +171,16 @@ const ShipmentOrderList: React.FC = () => {
                         </td>
                     </tr>
                   ))}
+                  {!loading && filteredData.length === 0 && (
+                    <tr>
+                      <td colSpan={7} className="py-20 text-center">
+                        <div className="flex flex-col items-center gap-4 opacity-20">
+                          <Truck size={48} />
+                          <p className="text-xs font-black uppercase tracking-widest">Kayıt Bulunamadı</p>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
                </tbody>
             </table>
          </div>

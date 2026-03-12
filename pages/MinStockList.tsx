@@ -88,6 +88,7 @@ const MinStockList: React.FC = () => {
                 <th className="px-6 py-4 text-[11px] font-black text-slate-400 uppercase tracking-widest">Stok Tanımı</th>
                 <th className="px-6 py-4 text-[11px] font-black text-slate-400 uppercase tracking-widest text-center">Mevcut</th>
                 <th className="px-6 py-4 text-[11px] font-black text-slate-400 uppercase tracking-widest text-center">Min. Seviye</th>
+                <th className="px-6 py-4 text-[11px] font-black text-slate-400 uppercase tracking-widest text-center">Max. Seviye</th>
                 <th className="px-6 py-4 text-[11px] font-black text-slate-400 uppercase tracking-widest text-right"></th>
               </tr>
             </thead>
@@ -100,6 +101,7 @@ const MinStockList: React.FC = () => {
                     </td>
                     <td className="px-6 py-4 text-center font-black text-rose-600">{(Number(stock.quantity) || 0).toLocaleString()}</td>
                     <td className="px-6 py-4 text-center font-black text-slate-400">{(Number(stock.minStockLevel) || 0).toLocaleString()}</td>
+                    <td className="px-6 py-4 text-center font-black text-slate-300">{(Number(stock.maxStockLevel) || 0).toLocaleString()}</td>
                     <td className="px-6 py-4 text-right"><MoreHorizontal size={18} className="text-slate-300" /></td>
                   </tr>
                 ))}

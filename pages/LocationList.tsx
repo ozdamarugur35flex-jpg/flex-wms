@@ -51,8 +51,8 @@ const LocationList: React.FC = () => {
   };
 
   const filteredLocations = locations.filter(l => 
-    l.cellCode.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    l.warehouseCode.includes(searchTerm)
+    (l.cellCode?.toLowerCase() || '').includes(searchTerm.toLowerCase()) || 
+    (l.warehouseCode?.toLowerCase() || '').includes(searchTerm.toLowerCase())
   );
 
   return (
@@ -141,8 +141,8 @@ const LocationList: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {filteredLocations.map((location) => (
-                  <tr key={location.id} className="hover:bg-slate-50 transition-colors group cursor-pointer" onClick={() => toggleSelectRow(location.id)}>
+                {filteredLocations.map((location, index) => (
+                  <tr key={location.cellCode || location.id || index} className="hover:bg-slate-50 transition-colors group cursor-pointer" onClick={() => toggleSelectRow(location.id)}>
                     <td className="px-6 py-4">
                       <input type="checkbox" className="w-4 h-4 rounded border-slate-300" checked={selectedRows.includes(location.id)} readOnly />
                     </td>
@@ -152,19 +152,19 @@ const LocationList: React.FC = () => {
                           <Grid3X3 size={20} />
                         </div>
                         <div>
-                          <p className="text-sm font-bold text-slate-800 font-mono tracking-tight">{location.cellCode}</p>
-                          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">DEPO: {location.warehouseCode}</p>
+                          <p className="text-sm font-bold text-slate-800 font-mono tracking-tight">{location.cellCode || 'KODSUZ'}</p>
+                          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">DEPO: {location.warehouseCode || '---'}</p>
                         </div>
                       </div>
                     </td>
                     <td className="px-6 py-4">
                       <div className="max-w-[240px] space-y-1.5">
                         <div className="flex items-center justify-between text-[10px] font-black">
-                          <span className={location.fillRate >= 90 ? 'text-rose-600' : 'text-emerald-600'}>{location.status.toUpperCase()}</span>
-                          <span className="text-slate-400">%{location.fillRate}</span>
+                          <span className={(Number(location.fillRate) || 0) >= 90 ? 'text-rose-600' : 'text-emerald-600'}>{(location.status || 'Boş').toUpperCase()}</span>
+                          <span className="text-slate-400">%{Number(location.fillRate) || 0}</span>
                         </div>
                         <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                          <div className={`h-full bg-emerald-500 ${location.fillRate >= 90 ? 'bg-rose-500' : ''}`} style={{ width: `${location.fillRate}%` }} />
+                          <div className={`h-full bg-emerald-500 ${(Number(location.fillRate) || 0) >= 90 ? 'bg-rose-500' : ''}`} style={{ width: `${Number(location.fillRate) || 0}%` }} />
                         </div>
                       </div>
                     </td>

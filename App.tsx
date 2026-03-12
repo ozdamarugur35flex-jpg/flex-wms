@@ -4,9 +4,9 @@ import { HashRouter, Routes, Route, Link, useLocation } from 'react-router-dom';
 import { 
   LayoutDashboard, FileStack, Target, ClipboardList, Calculator, PieChart, LayoutList, FileSpreadsheet, 
   UserPlus, ShieldCheck, Search, Bell, Database, Package, Users, Warehouse, LayoutGrid, Gauge, 
-  MinusCircle, Layers, Tag, ShoppingCart, PackageSearch, Truck, RefreshCcw, Factory, ArrowLeftRight, 
+  MinusCircle, Layers, Tag, ShoppingCart, PackageSearch, Truck, Receipt, RefreshCcw, Factory, ArrowLeftRight, 
   History, Calendar, Printer, ChevronLeft, ChevronRight, Sparkles, FileText, FileUp, FileDown, 
-  CheckCircle2, Settings2, ShieldAlert, Archive, FilePlus, Clock, Hash, ArrowUpRight, FileJson
+  CheckCircle2, Settings2, ShieldAlert, Archive, FilePlus, Clock, Hash, ArrowUpRight, FileJson, ArrowDownCircle
 } from 'lucide-react';
 
 import Dashboard from './pages/Dashboard';
@@ -15,9 +15,14 @@ import CustomerList from './pages/CustomerList';
 import WarehouseList from './pages/WarehouseList';
 import LocationList from './pages/LocationList';
 import WarehouseCapacityList from './pages/WarehouseCapacityList';
+import CellCapacityList from './pages/CellCapacityList';
+import StockWarehouseLimitList from './pages/StockWarehouseLimitList';
 import MinStockList from './pages/MinStockList';
 import VariantDefinitionList from './pages/VariantDefinitionList';
 import LabelPrinting from './pages/LabelPrinting';
+import PurchaseRequestList from './pages/PurchaseRequestList';
+import PurchaseOrderList from './pages/PurchaseOrderList';
+import PurchaseInvoiceList from './pages/PurchaseInvoiceList';
 import OrderApproval from './pages/OrderApproval';
 import CustomerOrder from './pages/CustomerOrder';
 import MaterialOrderTracking from './pages/MaterialOrderTracking';
@@ -102,7 +107,12 @@ const AppContent: React.FC = () => {
         { id: 'cari-kart', label: 'Cari Kartlar', icon: <Users size={18} />, path: '/cari-kart' },
         { id: 'depo-tanim', label: 'Depo Tanımları', icon: <Warehouse size={18} />, path: '/depo-tanim' },
         { id: 'depo-hucre', label: 'Hücre Tanımları', icon: <LayoutGrid size={18} />, path: '/depo-hucre' },
+        { id: 'hucre-kapasite', label: 'Hücre Kapasiteleri', icon: <Gauge size={18} />, path: '/hucre-kapasite' },
+        { id: 'stok-depo-limit', label: 'Stok Depo Limitleri', icon: <ArrowDownCircle size={18} />, path: '/stok-depo-limit' },
         { id: 'depo-kapasite', label: 'Kapasite Tanımları', icon: <Gauge size={18} />, path: '/depo-kapasite' },
+        { id: 'satin-alma-talep', label: 'Satın Alma Talepleri', icon: <ShoppingCart size={18} />, path: '/satin-alma-talep' },
+        { id: 'satin-alma-siparis', label: 'Satın Alma Siparişleri', icon: <Truck size={18} />, path: '/satin-alma-siparis' },
+        { id: 'satin-alma-irsaliye', label: 'Alış İrsaliyeleri', icon: <Receipt size={18} />, path: '/satin-alma-irsaliye' },
         { id: 'varyant-tanim', label: 'Varyant Tanımları', icon: <Layers size={18} />, path: '/varyant-definition' },
         { id: 'min-stok', label: 'Minimum Stok Listesi', icon: <MinusCircle size={18} />, path: '/min-stok' },
       ]
@@ -246,7 +256,12 @@ const AppContent: React.FC = () => {
             <Route path="/cari-kart" element={<CustomerList />} />
             <Route path="/depo-tanim" element={<WarehouseList />} />
             <Route path="/depo-hucre" element={<LocationList />} />
+            <Route path="/hucre-kapasite" element={<CellCapacityList />} />
+            <Route path="/stok-depo-limit" element={<StockWarehouseLimitList />} />
             <Route path="/depo-kapasite" element={<WarehouseCapacityList />} />
+            <Route path="/satin-alma-talep" element={<PurchaseRequestList />} />
+            <Route path="/satin-alma-siparis" element={<PurchaseOrderList />} />
+            <Route path="/satin-alma-irsaliye" element={<PurchaseInvoiceList />} />
             <Route path="/min-stok" element={<MinStockList />} />
             <Route path="/varyant-definition" element={<VariantDefinitionList />} />
             <Route path="/etiket-basim" element={<LabelPrinting />} />

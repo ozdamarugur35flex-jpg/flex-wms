@@ -127,7 +127,12 @@ const ShipmentOrderEntry: React.FC = () => {
                   </div>
                   <div className="space-y-1.5">
                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">İşlem Tarihi</label>
-                     <input type="date" className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold" value={header.date} />
+                     <input 
+                       type="date" 
+                       className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold outline-none focus:border-indigo-500" 
+                       value={header.date} 
+                       onChange={(e) => setHeader({...header, date: e.target.value})}
+                     />
                   </div>
                </div>
                <div className="space-y-1.5">

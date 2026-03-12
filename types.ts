@@ -16,6 +16,7 @@ export interface StockCard {
   salesPrices: number[];
   quantity: number;
   minStockLevel: number;
+  maxStockLevel?: number;
   leadTime: number;
   isLocked: boolean;
   isAutoConsumption: boolean;
@@ -50,6 +51,82 @@ export interface CustomerCard {
 export interface Warehouse { id: string; code: string; name: string; isLocked: boolean; isLocationTracking: boolean; lastActivity?: string; }
 export interface StorageLocation { id: string; warehouseCode: string; cellCode: string; status: 'Dolu' | 'Boş' | 'Rezerve'; fillRate: number; }
 export interface WarehouseCapacity { id: string; warehouseCode: string; stockGroupCode: string; maxCapacity: number; currentQuantity: number; unit: string; warningThreshold: number; }
+export interface CellCapacity { id: string; warehouseCode: string; cellCode: string; capacityQty: number; capacityWeight: number; capacityVolume: number; cellType?: string; }
+export interface StockAmbarLimit { id: string; stockCode: string; stockName: string; warehouseCode: number; minLevel: number; maxLevel: number; reorderPoint: number; }
+export interface PurchaseRequestItem {
+  id: string;
+  stockCode: string;
+  stockName?: string;
+  quantity: number;
+  unit: string;
+  deliveryDate: string;
+  description?: string;
+  status: 'Bekliyor' | 'Onaylandı' | 'Reddedildi' | 'Siparişe Dönüştü';
+}
+
+export interface PurchaseRequest {
+  id: string;
+  requestNo: string;
+  date: string;
+  department?: string;
+  projectCode?: string;
+  warehouseCode: number;
+  description?: string;
+  status: 'Taslak' | 'Onayda' | 'Onaylandı' | 'Reddedildi' | 'Tamamlandı';
+  items: PurchaseRequestItem[];
+  totalItems?: number;
+  requestedBy?: string;
+}
+
+export interface NetsisOrderItem {
+  id: string;
+  orderNo: string;
+  stockCode: string;
+  stockName?: string;
+  quantity: number;
+  receivedQuantity: number;
+  unit: string;
+  price: number;
+  deliveryDate: string;
+  warehouseCode: number;
+  status: 'Açık' | 'Kapalı' | 'Sevk Edildi';
+}
+
+export interface NetsisOrder {
+  id: string;
+  orderNo: string;
+  customerCode: string;
+  customerName?: string;
+  date: string;
+  totalAmount: number;
+  status: 'Bekliyor' | 'Onaylandı' | 'Reddedildi' | 'Tamamlandı';
+  items: NetsisOrderItem[];
+  description?: string;
+}
+
+export interface PurchaseInvoiceItem {
+  id: string;
+  invoiceNo: string;
+  stockCode: string;
+  stockName?: string;
+  quantity: number;
+  unit: string;
+  price: number;
+  date: string;
+  warehouseCode: number;
+}
+
+export interface PurchaseInvoice {
+  id: string;
+  invoiceNo: string;
+  customerCode: string;
+  customerName?: string;
+  date: string;
+  totalAmount: number;
+  gibInvoiceNo?: string;
+  description?: string;
+  items: PurchaseInvoiceItem[];
+}
 
 export interface StockVariant {
   id: string;
@@ -244,6 +321,17 @@ export interface InvoiceItem {
 export interface SalesInvoice {
     id: string;
     invoiceNo: string;
+    customerCode: string;
+    customerName: string;
+    date: string;
+    deliveryDate: string;
+    totalAmount: number;
+    projectCode: string;
+    description: string;
+    taxOffice: string;
+    taxNumber: string;
+    address: string;
+    items: InvoiceItem[];
 }
 
 export interface StockMovementLine {
@@ -504,6 +592,74 @@ export interface InactiveBranch {
     customerName: string;
     lastPurchaseDate: string;
     daysSinceLastPurchase: number;
+}
+
+export interface CustomerOrderHeader {
+  id: string;
+  orderNo: string;
+  date: string;
+  customerCode: string;
+  customerName?: string;
+  deliveryDate: string;
+  orderType: string; // Yurt İçi / Dışı
+  totalAmount: number;
+  riskStatus: {
+    limit: number;
+    balance: number;
+    netRisk: number;
+    checkRisk: number;
+  };
+  extraFields: Record<string, string>;
+}
+
+export interface CustomerOrderItem {
+  id: string;
+  stockCode: string;
+  stockName: string;
+  quantity: number;
+  price: number;
+  vatRate: number;
+  total: number;
+  deliveryDate: string;
+}
+
+export interface StockOrderBalance {
+  warehouseBalance: number;
+  reservedOrders: number;
+  futureOrders: number;
+}
+
+export interface SalesAnalysis {
+  pastPrices: { date: string; price: number }[];
+}
+
+export interface MaterialOrderStatus {
+  id: string;
+  orderNo: string;
+  stockCode: string;
+  stockName?: string;
+  supplierCode: string;
+  supplierName?: string;
+  orderDate: string;
+  orderedQuantity: number;
+  receivedQuantity: number;
+  remainingQuantity: number;
+  unit: string;
+  status: 'Açık' | 'Kapalı' | 'Kısmi';
+  lastDeliveryDate?: string;
+  lastWaybillNo?: string;
+}
+
+export interface VariantDefinition {
+  id: string;
+  stockCode: string;
+  stockName?: string;
+  variantCode: string;
+  variantName: string;
+  color?: string;
+  size?: string;
+  barcode?: string;
+  createdAt?: string;
 }
 
 export interface OperationalOrderItem {
