@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   Truck, 
   Plus, 
@@ -21,22 +21,21 @@ import {
   ShieldCheck,
   Globe,
   Info,
-  Building
+  Building,
+  Loader2
 } from 'lucide-react';
-import { ShipmentOrderItem } from '../types';
-
-const BRANCHES = ['Merkez', 'Fabrika-1', 'Fabrika-2', 'Lojistik Depo'];
-const CUSTOMERS = ['Aksoy Metal Sanayi', 'Yılmaz Lojistik A.Ş.', 'Global Export Ltd.'];
-const STOCKS = [
-  { code: 'AL-2020', name: 'Alüminyum Profil 20x20', unit: 'ADET' },
-  { code: 'SMN-M8', name: 'Çelik Somun M8', unit: 'ADET' },
-  { code: 'PL-3030', name: 'Plastik Kapak 30x30', unit: 'ADET' }
-];
+import { ShipmentOrderItem, StockCard, CustomerCard } from '../types';
+import { apiService } from '../api';
 
 const ShipmentOrderEntry: React.FC = () => {
   const [items, setItems] = useState<ShipmentOrderItem[]>([]);
+  const [stocks, setStocks] = useState<StockCard[]>([]);
+  const [customers, setCustomers] = useState<CustomerCard[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+
   const [header, setHeader] = useState({
-    branch: BRANCHES[0],
+    branch: 'Merkez',
     customer: '',
     orderNo: '',
     date: new Date().toISOString().split('T')[0]
@@ -48,6 +47,25 @@ const ShipmentOrderEntry: React.FC = () => {
     qty: 0,
     unit: 'ADET'
   });
+
+  useEffect(() => {
+    const loadInitialData = async () => {
+      try {
+        setLoading(true);
+        const [stockList, customerList] = await Promise.all([
+          apiService.stocks.getAll(),
+          apiService.customers.getAll()
+        ]);
+        setStocks(stockList);
+        setCustomers(customerList);
+      } catch (err) {
+        console.error("Veri yükleme hatası:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadInitialData();
+  }, []);
 
   const handleAddLine = () => {
     if(!lineEntry.stockCode || lineEntry.qty <= 0) return;
@@ -71,9 +89,52 @@ const ShipmentOrderEntry: React.FC = () => {
     setLineEntry({ stockCode: '', stockName: '', qty: 0, unit: 'ADET' });
   };
 
-  const handleTransferToTerminal = () => {
-    setItems(items.map(item => ({ ...item, terminalStatus: 'Aktarıldı' })));
+  const handleSave = async () => {
+    if (!header.customer || items.length === 0) {
+      alert("Müşteri seçilmeli ve en az bir kalem eklenmelidir!");
+      return;
+    }
+
+    try {
+      setIsSaving(true);
+      const customer = customers.find(c => c.name === header.customer);
+      const payload = {
+        customerCode: customer?.code || '',
+        orderNo: header.orderNo,
+        date: header.date,
+        items: items.map(i => ({
+          stockCode: i.stockCode,
+          quantity: i.orderedQty
+        }))
+      };
+
+      const res = await apiService.shipmentOrders.save(payload);
+      if (res.success) {
+        alert("Sevk emri başarıyla kaydedildi.");
+        setItems([]);
+        setHeader({ ...header, orderNo: '', customer: '' });
+      }
+    } catch (err) {
+      console.error("Kaydetme hatası:", err);
+      alert("Kaydedilirken bir hata oluştu.");
+    } finally {
+      setIsSaving(false);
+    }
   };
+
+  const handleTransferToTerminal = () => {
+    if (items.length === 0) return;
+    setItems(items.map(item => ({ ...item, terminalStatus: 'Aktarıldı' })));
+    alert("Kalemler el terminaline aktarıldı.");
+  };
+
+  if (loading) {
+    return (
+      <div className="h-full flex items-center justify-center">
+        <Loader2 className="w-12 h-12 text-indigo-600 animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
@@ -90,11 +151,26 @@ const ShipmentOrderEntry: React.FC = () => {
         </div>
         
         <div className="flex items-center gap-2">
-          <button className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-600 rounded-xl text-xs font-bold hover:bg-slate-50 transition-all active:scale-95">
+          <button 
+            onClick={() => {
+              setItems([]);
+              setHeader({
+                branch: 'Merkez',
+                customer: '',
+                orderNo: '',
+                date: new Date().toISOString().split('T')[0]
+              });
+            }}
+            className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-600 rounded-xl text-xs font-bold hover:bg-slate-50 transition-all active:scale-95"
+          >
             <Plus size={16} className="text-indigo-600" /> Yeni Emir
           </button>
-          <button className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-xl text-xs font-black shadow-lg shadow-emerald-100 hover:bg-emerald-700 transition-all active:scale-95">
-            <Save size={16} /> Kaydet
+          <button 
+            onClick={handleSave}
+            disabled={isSaving}
+            className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-xl text-xs font-black shadow-lg shadow-emerald-100 hover:bg-emerald-700 transition-all active:scale-95 disabled:opacity-50"
+          >
+            {isSaving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />} Kaydet
           </button>
           <div className="w-[1px] h-6 bg-slate-200 mx-1" />
           <button 
@@ -122,7 +198,10 @@ const ShipmentOrderEntry: React.FC = () => {
                        value={header.branch}
                        onChange={(e) => setHeader({...header, branch: e.target.value})}
                      >
-                        {BRANCHES.map(b => <option key={b} value={b}>{b}</option>)}
+                        <option value="Merkez">Merkez</option>
+                        <option value="Fabrika-1">Fabrika-1</option>
+                        <option value="Fabrika-2">Fabrika-2</option>
+                        <option value="Lojistik Depo">Lojistik Depo</option>
                      </select>
                   </div>
                   <div className="space-y-1.5">
@@ -143,7 +222,7 @@ const ShipmentOrderEntry: React.FC = () => {
                     onChange={(e) => setHeader({...header, customer: e.target.value})}
                   >
                      <option value="">Seçiniz...</option>
-                     {CUSTOMERS.map(c => <option key={c} value={c}>{c}</option>)}
+                     {customers.map(c => <option key={c.code} value={c.name}>{c.code} | {c.name}</option>)}
                   </select>
                </div>
                <div className="space-y-1.5">
@@ -196,12 +275,12 @@ const ShipmentOrderEntry: React.FC = () => {
                  className="w-full px-5 py-4 bg-white/10 border border-white/20 rounded-[1.5rem] text-sm font-black outline-none focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-500 backdrop-blur-md transition-all appearance-none pr-12"
                  value={lineEntry.stockCode}
                  onChange={(e) => {
-                    const s = STOCKS.find(x => x.code === e.target.value);
-                    if(s) setLineEntry({...lineEntry, stockCode: s.code, stockName: s.name, unit: s.unit});
+                    const s = stocks.find(x => x.code === e.target.value);
+                    if(s) setLineEntry({...lineEntry, stockCode: s.code, stockName: s.name, unit: s.unit1 || 'ADET'});
                  }}
                >
                   <option value="" className="text-slate-900">Ürün Seçiniz...</option>
-                  {STOCKS.map(s => <option key={s.code} value={s.code} className="text-slate-900">{s.code} | {s.name}</option>)}
+                  {stocks.map(s => <option key={s.code} value={s.code} className="text-slate-900">{s.code} | {s.name}</option>)}
                </select>
             </div>
             <div className="lg:col-span-3 space-y-2">

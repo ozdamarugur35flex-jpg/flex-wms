@@ -6,13 +6,10 @@
 
 // Sunucu IP'niz ve IIS yapılandırmanıza göre burayı düzenleyin
 // Eğer IIS'de 'api' klasörüne yayınladıysanız ve kodda [Route("api/...")] varsa sonuna /api eklemeniz gerekebilir
-const API_BASE_URL = (import.meta as any).env.VITE_API_URL || 'http://192.168.1.203/api';
+const API_BASE_URL = (import.meta as any).env.VITE_API_URL || '/api';
 
 // --- MOCK DATA FALLBACK ---
-const MOCK_STOCKS = [
-  { id: '1', code: 'AL-2020', name: 'Alüminyum Profil 20x20', unit1: 'ADET', quantity: 1500, minStockLevel: 500, lastPurchasePrice: 120.50, isLocked: false, groupCode: 'HAMMADDE' },
-  { id: '2', code: 'SMN-M8', name: 'Çelik Somun M8', unit1: 'ADET', quantity: 15500, minStockLevel: 1000, lastPurchasePrice: 1.25, isLocked: false, groupCode: 'BAĞLANTI' },
-];
+const MOCK_STOCKS: any[] = [];
 
 const request = async (url: string, options?: RequestInit, fallbackData?: any, mapper?: (item: any) => any) => {
   try {
@@ -293,7 +290,7 @@ export const apiService = {
       request(`${API_BASE_URL}/stocks/min-levels`, undefined, MOCK_STOCKS.filter(s => s.quantity < s.minStockLevel), mapStockData),
 
     getDetail: (code: string) => 
-      request(`${API_BASE_URL}/stocks/${code}`, undefined, MOCK_STOCKS[0], mapStockData),
+      request(`${API_BASE_URL}/stocks/${code}`, undefined, null, mapStockData),
     
     generateNextCode: (prefix: string) => 
       request(`${API_BASE_URL}/stocks/next-code/${prefix}`, undefined, { nextCode: `${prefix}0001` }),
@@ -310,12 +307,19 @@ export const apiService = {
   },
 
   dashboard: {
-    getStats: () => request(`${API_BASE_URL}/dashboard/stats`, undefined, { totalStockValue: "₺1.4M", pendingShipments: "42", dailySales: "₺38K", criticalStockCount: "12" }),
+    getStats: () => request(`${API_BASE_URL}/dashboard/stats`, undefined, { totalStockValue: "₺0", pendingShipments: "0", dailySales: "₺0", criticalStockCount: "0" }),
     getCharts: () => request(`${API_BASE_URL}/dashboard/charts`, undefined, []),
+    getLogs: () => request(`${API_BASE_URL}/dashboard/logs`, undefined, []),
   },
 
   customers: {
     getAll: () => request(`${API_BASE_URL}/customers`, undefined, [], mapCustomerData),
+    save: (data: any) => request(`${API_BASE_URL}/customers`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    }, { success: true }),
+    delete: (code: string) => request(`${API_BASE_URL}/customers/${code}`, { method: 'DELETE' }, { success: true }),
   },
 
   warehouses: {
@@ -407,5 +411,29 @@ export const apiService = {
     }, { success: true }),
     delete: (invoiceNo: string) => request(`${API_BASE_URL}/salesinvoices/${invoiceNo}`, { method: 'DELETE' }, { success: true }),
     generateNextNo: () => request(`${API_BASE_URL}/salesinvoices/next-no`, undefined, { nextNo: '' }),
+  },
+  reports: {
+    getWarehouseBalances: () => request(`${API_BASE_URL}/reports/warehouse-balances`, undefined, []),
+    getStockMovements: (stockCodes: string[], startDate: string, endDate: string) => 
+      request(`${API_BASE_URL}/reports/stock-movements`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ stockCodes, startDate, endDate })
+      }, []),
+    getStockWarehouseBalances: (stockCodes: string[]) => 
+      request(`${API_BASE_URL}/reports/stock-warehouse-balances`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ stockCodes })
+      }, []),
+  },
+  production: {
+    getAll: () => request(`${API_BASE_URL}/production`, undefined, []),
+    getMaterialStatus: (jobOrderNo: string) => request(`${API_BASE_URL}/production/material-status/${jobOrderNo}`, undefined, []),
+    save: (data: any) => request(`${API_BASE_URL}/production`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    }, { success: true }),
   }
 };

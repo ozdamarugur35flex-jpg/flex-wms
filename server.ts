@@ -151,6 +151,16 @@ async function startServer() {
       { name: 'Cum', satis: 1890, alis: 4800 },
     ]);
   });
+  
+  // [GET] /api/dashboard/logs
+  app.get("/api/dashboard/logs", (req, res) => {
+    res.json([
+      { message: "Netsis Entegrasyonu: Başarılı", time: "14:05" },
+      { message: "Stok Güncelleme Tamamlandı", time: "13:45" },
+      { message: "Yeni Sevkiyat Emri Alındı", time: "12:30" },
+      { message: "Depo Sayımı Başlatıldı", time: "10:15" }
+    ]);
+  });
 
   // [GET] /api/stocks/min-levels
   app.get("/api/stocks/min-levels", (req, res) => {

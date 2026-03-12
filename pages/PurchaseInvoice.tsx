@@ -23,34 +23,29 @@ import {
   Settings2,
   RefreshCcw,
   Globe,
-  Lock
+  Lock,
+  Loader2
 } from 'lucide-react';
-import { InvoiceItem } from '../types';
-
-// Mock stock database for VAT retrieval
-const stockDb = [
-  { code: 'AL-2020', name: 'Alüminyum Profil 20x20', vat: 20 },
-  { code: 'SMN-M8', name: 'Çelik Somun M8', vat: 10 },
-  { code: 'BND-45', name: 'Koli Bandı 45mm', vat: 20 },
-];
-
-const mockItems: InvoiceItem[] = [
-  { id: '1', stockCode: 'AL-2020', stockName: 'Alüminyum Profil 20x20', loadingDate: '2024-03-20', deliveryDate: '2024-03-25', conversion: 1, quantity: 1000, currencyType: 'TRY', currencyPrice: 0, exchangeRate: 1, warehouseCode: '01', price: 405.62, vat: 20, total: 486744.00 },
-];
+import { InvoiceItem, StockCard, CustomerCard } from '../types';
+import { apiService } from '../api';
 
 const PurchaseInvoice: React.FC = () => {
   const today = new Date().toISOString().split('T')[0];
   const [activeTab, setActiveTab] = useState<'header' | 'lines'>('header');
   const [isExtraFieldsOpen, setExtraFieldsOpen] = useState(false);
-  const [items, setItems] = useState<InvoiceItem[]>(mockItems);
+  const [items, setItems] = useState<InvoiceItem[]>([]);
+  const [stocks, setStocks] = useState<StockCard[]>([]);
+  const [customers, setCustomers] = useState<CustomerCard[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   
   // Header State
   const [invoiceHeader, setInvoiceHeader] = useState({
     invoiceNo: '',
     date: today,
     deliveryDate: today,
-    customerCode: 'CARI-001',
-    customerName: 'Aksoy Metal Sanayi ve Tic. Ltd.',
+    customerCode: '',
+    customerName: '',
     type: 'YURT İÇİ' as const,
     description: ''
   });
@@ -64,6 +59,25 @@ const PurchaseInvoice: React.FC = () => {
     vat: 20
   });
 
+  useEffect(() => {
+    const fetchData = async () => {
+      setIsLoading(true);
+      try {
+        const [stockList, customerList] = await Promise.all([
+          apiService.stocks.getAll(),
+          apiService.customers.getAll()
+        ]);
+        setStocks(stockList);
+        setCustomers(customerList);
+      } catch (error) {
+        console.error('Data fetch error:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchData();
+  }, []);
+
   // Check if editing is allowed (Only on the same day)
   const canEdit = invoiceHeader.date === today;
 
@@ -76,12 +90,89 @@ const PurchaseInvoice: React.FC = () => {
   };
 
   const handleStockChange = (code: string) => {
-    const stock = stockDb.find(s => s.code === code);
+    const stock = stocks.find(s => s.code === code);
     setLineEntry(prev => ({
       ...prev,
       stockCode: code,
-      vat: stock ? stock.vat : 20 // Rule: VAT comes from stock card
+      vat: stock ? stock.purchaseVat : 20 // Rule: VAT comes from stock card
     }));
+  };
+
+  const handleCustomerChange = (code: string) => {
+    const customer = customers.find(c => c.code === code);
+    if (customer) {
+      setInvoiceHeader(prev => ({
+        ...prev,
+        customerCode: code,
+        customerName: customer.name
+      }));
+    }
+  };
+
+  const handleAddLine = () => {
+    if (!lineEntry.stockCode || lineEntry.qty <= 0) return;
+    
+    const stock = stocks.find(s => s.code === lineEntry.stockCode);
+    const newItem: InvoiceItem = {
+      id: Math.random().toString(36).substr(2, 9),
+      stockCode: lineEntry.stockCode,
+      stockName: stock?.name || '',
+      loadingDate: invoiceHeader.date,
+      deliveryDate: invoiceHeader.deliveryDate,
+      conversion: 1,
+      quantity: lineEntry.qty,
+      currencyType: 'TRY',
+      currencyPrice: lineEntry.price,
+      exchangeRate: 1,
+      warehouseCode: lineEntry.warehouse,
+      price: lineEntry.price,
+      vat: lineEntry.vat,
+      total: lineEntry.qty * lineEntry.price * (1 + lineEntry.vat / 100)
+    };
+
+    setItems(prev => [...prev, newItem]);
+    setLineEntry({
+      stockCode: '',
+      warehouse: '01',
+      qty: 0,
+      price: 0,
+      vat: 20
+    });
+  };
+
+  const handleSave = async () => {
+    if (!invoiceHeader.invoiceNo || !invoiceHeader.customerCode || items.length === 0) {
+      alert('Lütfen fatura numarası, tedarikçi ve en az bir kalem giriniz.');
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const payload = {
+        ...invoiceHeader,
+        items: items
+      };
+      const result = await apiService.purchaseInvoices.save(payload);
+      if (result.success) {
+        alert('Alış irsaliyesi başarıyla kaydedildi.');
+        // Reset form
+        setInvoiceHeader({
+          invoiceNo: '',
+          date: today,
+          deliveryDate: today,
+          customerCode: '',
+          customerName: '',
+          type: 'YURT İÇİ',
+          description: ''
+        });
+        setItems([]);
+      }
+    } catch (error) {
+      console.error('Save error:', error);
+      alert('Kaydetme sırasında bir hata oluştu.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const totals = useMemo(() => {
@@ -120,8 +211,13 @@ const PurchaseInvoice: React.FC = () => {
               <button className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-600 rounded-xl text-xs font-bold hover:bg-slate-50 transition-all active:scale-95">
                 <Plus size={16} className="text-emerald-600" /> Yeni
               </button>
-              <button className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-xl text-xs font-black shadow-lg shadow-emerald-100 hover:bg-emerald-700 transition-all active:scale-95">
-                <Save size={16} /> Kaydet
+              <button 
+                onClick={handleSave}
+                disabled={isSaving || !canEdit}
+                className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-xl text-xs font-black shadow-lg shadow-emerald-100 hover:bg-emerald-700 transition-all active:scale-95 disabled:opacity-50"
+              >
+                {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save size={16} />}
+                Kaydet
               </button>
             </>
           )}
@@ -206,9 +302,10 @@ const PurchaseInvoice: React.FC = () => {
                         className="w-full px-5 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none focus:border-emerald-500"
                         value={invoiceHeader.customerCode}
                         disabled={!canEdit}
-                        onChange={(e) => setInvoiceHeader({...invoiceHeader, customerCode: e.target.value})}
+                        onChange={(e) => handleCustomerChange(e.target.value)}
                       >
-                         <option value="CARI-001">CARI-001 | AKSOY METAL LTD.</option>
+                         <option value="">Seçiniz...</option>
+                         {customers.map(c => <option key={c.code} value={c.code}>{c.code} | {c.name}</option>)}
                       </select>
                    </div>
                 </div>
@@ -294,7 +391,7 @@ const PurchaseInvoice: React.FC = () => {
                       onChange={(e) => handleStockChange(e.target.value)}
                     >
                        <option value="" className="text-slate-900">Seçiniz...</option>
-                       {stockDb.map(s => <option key={s.code} value={s.code} className="text-slate-900">{s.code} | {s.name}</option>)}
+                       {stocks.map(s => <option key={s.code} value={s.code} className="text-slate-900">{s.code} | {s.name}</option>)}
                     </select>
                  </div>
 
@@ -331,6 +428,7 @@ const PurchaseInvoice: React.FC = () => {
 
                  <div className="lg:col-span-2 space-y-2">
                     <button 
+                      onClick={handleAddLine}
                       disabled={!canEdit || !lineEntry.stockCode || lineEntry.qty <= 0}
                       className="w-full bg-emerald-500 hover:bg-emerald-600 text-white py-4 rounded-[1.5rem] text-xs font-black uppercase tracking-[0.2em] shadow-xl shadow-emerald-500/20 active:scale-95 transition-all flex items-center justify-center gap-3 disabled:opacity-30 disabled:cursor-not-allowed"
                     >
@@ -368,7 +466,18 @@ const PurchaseInvoice: React.FC = () => {
                        </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                       {items.map(item => (
+                       {isLoading ? (
+                         <tr>
+                           <td colSpan={8} className="px-6 py-12 text-center">
+                             <Loader2 className="w-8 h-8 text-emerald-600 animate-spin mx-auto mb-2" />
+                             <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Veriler Yükleniyor...</p>
+                           </td>
+                         </tr>
+                       ) : items.length === 0 ? (
+                         <tr>
+                           <td colSpan={8} className="px-6 py-12 text-center text-slate-400 italic">Henüz kalem eklenmedi.</td>
+                         </tr>
+                       ) : items.map(item => (
                           <tr key={item.id} className="hover:bg-emerald-50/20 transition-all group">
                              <td className="px-6 py-4">
                                 <div className="flex items-center gap-3">

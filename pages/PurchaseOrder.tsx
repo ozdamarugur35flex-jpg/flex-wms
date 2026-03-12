@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   ShoppingCart, 
   Search, 
@@ -22,54 +22,35 @@ import {
   Hash,
   Database,
   Building,
-  Edit
+  Edit,
+  Loader2
 } from 'lucide-react';
 import { PurchaseOrderItem, DeliveryHistory } from '../types';
-
-const mockOrders: PurchaseOrderItem[] = [
-  { 
-    id: 'PO-001', 
-    requisitionId: 'R1', 
-    stockCode: 'STK001', 
-    stockName: 'Alüminyum Profil 20x20', 
-    branchName: 'Fabrika-1',
-    supplierName: 'Aksoy Metal', 
-    orderedQty: 1000, 
-    receivedQty: 400, 
-    balance: 600, 
-    lastPurchasePrice: 42.80, 
-    lastSupplier: 'Yılmaz Profil Co.', 
-    unit: 'ADET', 
-    status: 'Kısmi Teslim',
-    isRevised: true,
-    deliveries: [
-      { date: '2024-03-21', quantity: 400, receivedBy: 'Mustafa A.' }
-    ]
-  },
-  { 
-    id: 'PO-002', 
-    requisitionId: 'R2', 
-    stockCode: 'STK002', 
-    stockName: 'Çelik Somun M8', 
-    branchName: 'Merkez',
-    supplierName: 'Civata Dünyası', 
-    orderedQty: 5000, 
-    receivedQty: 0, 
-    balance: 5000, 
-    lastPurchasePrice: 1.15, 
-    lastSupplier: 'Civata Dünyası', 
-    unit: 'ADET', 
-    status: 'Açık',
-    isRevised: false,
-    deliveries: []
-  }
-];
+import { apiService } from '../api';
 
 const PurchaseOrder: React.FC = () => {
-  const [orders, setOrders] = useState<PurchaseOrderItem[]>(mockOrders);
+  const [orders, setOrders] = useState<PurchaseOrderItem[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedOrder, setSelectedOrder] = useState<PurchaseOrderItem | null>(null);
   const [receiveQty, setReceiveQty] = useState(0);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+
+  const fetchData = async () => {
+    setIsLoading(true);
+    try {
+      const orderList = await apiService.purchaseOrders.getAll();
+      setOrders(orderList);
+    } catch (error) {
+      console.error('Data fetch error:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, []);
 
   const filteredOrders = useMemo(() => {
     return orders.filter(o => 
@@ -80,33 +61,29 @@ const PurchaseOrder: React.FC = () => {
     );
   }, [orders, searchTerm]);
 
-  const handleReceive = () => {
+  const handleReceive = async () => {
     if(!selectedOrder || receiveQty <= 0) return;
     
-    const newHistory: DeliveryHistory = {
-      date: new Date().toISOString().split('T')[0],
-      quantity: receiveQty,
-      receivedBy: 'Mustafa Aksoy'
-    };
+    setIsSaving(true);
+    try {
+      const payload = {
+        orderNo: selectedOrder.id,
+        receivedQuantity: receiveQty,
+        date: new Date().toISOString().split('T')[0],
+        receivedBy: 'Mustafa Aksoy'
+      };
 
-    const updatedOrders = orders.map(o => {
-      if(o.id === selectedOrder.id) {
-        const newReceived = o.receivedQty + receiveQty;
-        const newBalance = o.orderedQty - newReceived;
-        return {
-          ...o,
-          receivedQty: newReceived,
-          balance: newBalance,
-          status: newBalance <= 0 ? 'Tamamlandı' : 'Kısmi Teslim',
-          deliveries: [...o.deliveries, newHistory]
-        } as PurchaseOrderItem;
+      const result = await apiService.purchaseOrders.save(payload);
+      if (result.success) {
+        await fetchData();
+        setSelectedOrder(null);
+        setReceiveQty(0);
       }
-      return o;
-    });
-
-    setOrders(updatedOrders);
-    setSelectedOrder(null);
-    setReceiveQty(0);
+    } catch (error) {
+      console.error('Receive error:', error);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -159,7 +136,18 @@ const PurchaseOrder: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {filteredOrders.map((o) => (
+              {isLoading ? (
+                <tr>
+                  <td colSpan={6} className="px-6 py-12 text-center">
+                    <Loader2 className="w-8 h-8 text-emerald-600 animate-spin mx-auto mb-2" />
+                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Veriler Yükleniyor...</p>
+                  </td>
+                </tr>
+              ) : filteredOrders.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="px-6 py-12 text-center text-slate-400 italic">Kayıt bulunamadı.</td>
+                </tr>
+              ) : filteredOrders.map((o) => (
                 <tr key={o.id} className="hover:bg-emerald-50/20 transition-all group">
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-4">
@@ -340,9 +328,11 @@ const PurchaseOrder: React.FC = () => {
                <button onClick={() => setSelectedOrder(null)} className="text-xs font-black text-slate-400 hover:text-slate-600 uppercase tracking-widest transition-all">İptal</button>
                <button 
                   onClick={handleReceive}
-                  className="px-10 py-4 bg-emerald-600 text-white text-xs font-black rounded-2xl hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-100 flex items-center gap-3 uppercase tracking-[0.1em]"
+                  disabled={isSaving || receiveQty <= 0}
+                  className="px-10 py-4 bg-emerald-600 text-white text-xs font-black rounded-2xl hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-100 flex items-center gap-3 uppercase tracking-[0.1em] disabled:opacity-50"
                >
-                  <Save size={18} /> Girişi Onayla
+                  {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save size={18} />}
+                  Girişi Onayla
                </button>
             </div>
           </div>

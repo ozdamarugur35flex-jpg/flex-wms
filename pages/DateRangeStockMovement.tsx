@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   Calendar, 
   RotateCcw, 
@@ -30,87 +30,108 @@ import {
   FileUp,
   LogIn,
   LogOut,
-  Check
+  Check,
+  Loader2
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { StockListItem, StockMovementReportItem, StockWarehouseBalance } from '../types';
-
-const mockStocks: StockListItem[] = [
-  { id: '1', code: 'AL-2020', name: 'Alüminyum Profil 20x20', groupCode: 'HAM', unit: 'ADET' },
-  { id: '2', code: 'SMN-M8', name: 'Çelik Somun M8', groupCode: 'BGL', unit: 'ADET' },
-  { id: '3', code: 'PL-3030', name: 'Plastik Kapak 30x30', groupCode: 'MML', unit: 'ADET' },
-  { id: '4', code: 'BND-45', name: 'Koli Bandı 45mm', groupCode: 'SRF', unit: 'RULO' },
-];
-
-const mockMovements: (StockMovementReportItem & { recordedBy: string; orderNo?: string; isReturn: boolean })[] = [
-  { id: 'm1', year: '2024', date: '2024-03-01', slipNo: 'FIS-001', type: 'Alış', price: 12.50, inQty: 1000, outQty: 0, balance: 1000, description: 'Satınalma Girişi', warehouseCode: '01', customerName: 'Aksoy Metal', recordedBy: 'Mustafa A.', orderNo: 'SİP-101', isReturn: false },
-  { id: 'm2', year: '2024', date: '2024-03-05', slipNo: 'FIS-005', type: 'Sevkiyat', price: 18.00, inQty: 0, outQty: 200, balance: 800, description: 'Müşteri Sevkiyat', warehouseCode: '01', customerName: 'Yılmaz Ltd.', recordedBy: 'Ahmet Y.', orderNo: 'SİP-205', isReturn: false },
-  { id: 'm3', year: '2024', date: '2024-03-10', slipNo: 'FIS-012', type: 'Üretim', price: 0, inQty: 500, outQty: 0, balance: 1300, description: 'Bant Üretim Giriş', warehouseCode: '01', customerName: 'Dahili', recordedBy: 'Zeynep K.', orderNo: 'İE-99', isReturn: false },
-  { id: 'm4', year: '2024', date: '2024-03-15', slipNo: 'FIS-015', type: 'İade', price: 12.50, inQty: 0, outQty: 50, balance: 1250, description: 'Hasarlı Ürün İadesi', warehouseCode: '01', customerName: 'Aksoy Metal', recordedBy: 'Mustafa A.', orderNo: 'SİP-101', isReturn: true },
-];
-
-const mockBalances: StockWarehouseBalance[] = [
-  { id: 'b1', warehouseCode: '01', warehouseName: 'Merkez Depo', balance: 1200 },
-  { id: 'b2', warehouseCode: '02', warehouseName: 'Hammadde Depo', balance: 50 },
-];
+import { apiService } from '../api';
 
 type MovementCategory = 'Alış İrsaliyesi' | 'Satış İrsaliyesi' | 'Ambar Giriş' | 'Ambar Çıkış';
 
 const DateRangeStockMovement: React.FC = () => {
-  const [dates, setDates] = useState({ start: '2024-03-01', end: '2024-03-31' });
-  const [selectedStockIds, setSelectedStockIds] = useState<string[]>([mockStocks[0].id]);
+  const [dates, setDates] = useState({ start: new Date().toISOString().split('T')[0], end: new Date().toISOString().split('T')[0] });
+  const [stocks, setStocks] = useState<StockListItem[]>([]);
+  const [selectedStockCodes, setSelectedStockCodes] = useState<string[]>([]);
+  const [movements, setMovements] = useState<(StockMovementReportItem & { recordedBy: string; orderNo?: string; isReturn: boolean })[]>([]);
+  const [balances, setBalances] = useState<StockWarehouseBalance[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [stocksLoading, setStocksLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'movements' | 'balances'>('movements');
   const [selectedCategory, setSelectedCategory] = useState<MovementCategory>('Alış İrsaliyesi');
   const [isSidebarOpen, setSidebarOpen] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
 
+  const loadStocks = async () => {
+    try {
+      setStocksLoading(true);
+      const data = await apiService.stocks.getAll();
+      setStocks(data.map(s => ({ id: s.id, code: s.code, name: s.name, groupCode: s.groupCode, unit: s.unit1 })));
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setStocksLoading(false);
+    }
+  };
+
+  const loadMovements = async () => {
+    if (selectedStockCodes.length === 0) return;
+    try {
+      setLoading(true);
+      const [movementData, balanceData] = await Promise.all([
+        apiService.reports.getStockMovements(selectedStockCodes, dates.start, dates.end),
+        apiService.reports.getStockWarehouseBalances(selectedStockCodes)
+      ]);
+      setMovements(movementData);
+      setBalances(balanceData);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadStocks();
+  }, []);
+
   const getCategory = (type: string): MovementCategory => {
-    if (type === 'Alış') return 'Alış İrsaliyesi';
-    if (type === 'Sevkiyat') return 'Satış İrsaliyesi';
-    if (type === 'Üretim') return 'Ambar Giriş';
-    if (type === 'İade') return 'Ambar Çıkış';
+    if (type === 'Alış' || type === 'Alış İrsaliyesi') return 'Alış İrsaliyesi';
+    if (type === 'Sevkiyat' || type === 'Satış İrsaliyesi') return 'Satış İrsaliyesi';
+    if (type === 'Üretim' || type === 'Ambar Giriş') return 'Ambar Giriş';
+    if (type === 'İade' || type === 'Ambar Çıkış') return 'Ambar Çıkış';
     return 'Ambar Giriş';
   };
 
   const filteredStocks = useMemo(() => {
-    return mockStocks.filter(s => 
-      s.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-      s.code.toLowerCase().includes(searchTerm.toLowerCase())
+    return stocks.filter(s => 
+      (s.name?.toLowerCase() || '').includes(searchTerm.toLowerCase()) || 
+      (s.code?.toLowerCase() || '').includes(searchTerm.toLowerCase())
     );
-  }, [searchTerm]);
+  }, [searchTerm, stocks]);
 
   const filteredMovements = useMemo(() => {
-    return mockMovements.filter(m => getCategory(m.type) === selectedCategory);
-  }, [selectedCategory]);
+    return movements.filter(m => getCategory(m.type) === selectedCategory);
+  }, [selectedCategory, movements]);
 
   const handleExportExcel = () => {
-    const dataToExport = activeTab === 'movements' ? filteredMovements : mockBalances;
+    const dataToExport = activeTab === 'movements' ? filteredMovements : balances;
     const worksheet = XLSX.utils.json_to_sheet(dataToExport);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Tarihli Stok Hareket");
     XLSX.writeFile(workbook, `Tarih_Aralikli_Stok_${activeTab}.xlsx`);
   };
 
-  const toggleStockSelection = (id: string) => {
-    setSelectedStockIds(prev => 
-      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+  const toggleStockSelection = (code: string) => {
+    setSelectedStockCodes(prev => 
+      prev.includes(code) ? prev.filter(c => c !== code) : [...prev, code]
     );
   };
 
   const handleSelectAll = () => {
-    setSelectedStockIds(filteredStocks.map(s => s.id));
+    setSelectedStockCodes(filteredStocks.map(s => s.code));
   };
 
   const handleClearSelection = () => {
-    setSelectedStockIds([]);
+    setSelectedStockCodes([]);
   };
 
   const selectedStocksDisplay = useMemo(() => {
-    const selected = mockStocks.filter(s => selectedStockIds.includes(s.id));
+    const selected = stocks.filter(s => selectedStockCodes.includes(s.code));
     if (selected.length === 0) return "Stok Seçilmedi";
     if (selected.length === 1) return selected[0].name;
     return `${selected.length} Adet Stok Seçili`;
-  }, [selectedStockIds]);
+  }, [selectedStockCodes, stocks]);
 
   return (
     <div className="flex h-[calc(100vh-140px)] gap-6 animate-in fade-in duration-500 overflow-hidden">
@@ -158,7 +179,9 @@ const DateRangeStockMovement: React.FC = () => {
                         onChange={(e) => setDates({...dates, end: e.target.value})}
                      />
                   </div>
-                  <button className="w-full py-3 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase tracking-[0.2em] shadow-lg shadow-slate-200 active:scale-95 transition-all">LİSTELE</button>
+                  <button onClick={loadMovements} className="w-full py-3 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase tracking-[0.2em] shadow-lg shadow-slate-200 active:scale-95 transition-all flex items-center justify-center gap-2">
+                    {loading && <Loader2 size={14} className="animate-spin" />} LİSTELE
+                  </button>
                </div>
 
                <div className="p-4 border-b border-slate-100 space-y-3">
@@ -185,12 +208,16 @@ const DateRangeStockMovement: React.FC = () => {
                </div>
 
                <div className="flex-1 overflow-y-auto custom-scrollbar p-2 space-y-1 bg-slate-50/20">
-                  {filteredStocks.map(stock => {
-                     const isSelected = selectedStockIds.includes(stock.id);
+                  {stocksLoading ? (
+                    <div className="flex items-center justify-center py-8">
+                       <Loader2 className="w-6 h-6 text-indigo-600 animate-spin" />
+                    </div>
+                  ) : filteredStocks.map(stock => {
+                     const isSelected = selectedStockCodes.includes(stock.code);
                      return (
                         <div 
                            key={stock.id}
-                           onClick={() => toggleStockSelection(stock.id)}
+                           onClick={() => toggleStockSelection(stock.code)}
                            className={`p-4 rounded-2xl border transition-all cursor-pointer flex flex-col gap-2 group ${isSelected ? 'bg-indigo-600 border-indigo-600 text-white shadow-xl shadow-indigo-100' : 'bg-white border-slate-100 text-slate-600 hover:border-indigo-200 hover:bg-indigo-50/30'}`}
                         >
                            <div className="flex items-center justify-between">
@@ -266,7 +293,9 @@ const DateRangeStockMovement: React.FC = () => {
                  <span className="text-[9px] uppercase tracking-widest">{dates.start} — {dates.end}</span>
               </div>
               <div className="flex items-end gap-2 justify-end">
-                 <h3 className="text-3xl font-black tracking-tighter text-emerald-400">{mockMovements[mockMovements.length-1].balance.toLocaleString()}</h3>
+                 <h3 className="text-3xl font-black tracking-tighter text-emerald-400">
+                   {movements.length > 0 ? movements[movements.length - 1].balance.toLocaleString() : '0'}
+                 </h3>
                  <span className="text-xs font-black text-slate-400 mb-1.5">BİRİM</span>
               </div>
            </div>
@@ -393,8 +422,8 @@ const DateRangeStockMovement: React.FC = () => {
                        </div>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                       {mockBalances.map(wb => (
-                          <div key={wb.id} className={`p-6 rounded-[2.5rem] border-2 transition-all group hover:shadow-xl ${wb.balance > 0 ? 'bg-indigo-50/30 border-indigo-100 hover:border-indigo-300' : 'bg-slate-50 border-slate-100'}`}>
+                       {balances.map(wb => (
+                          <div key={wb.warehouseCode} className={`p-6 rounded-[2.5rem] border-2 transition-all group hover:shadow-xl ${wb.balance > 0 ? 'bg-indigo-50/30 border-indigo-100 hover:border-indigo-300' : 'bg-slate-50 border-slate-100'}`}>
                              <div className="flex items-center justify-between mb-4">
                                 <div className="flex items-center gap-3">
                                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${wb.balance > 0 ? 'bg-indigo-600 text-white' : 'bg-slate-200 text-slate-400'}`}>
@@ -403,6 +432,18 @@ const DateRangeStockMovement: React.FC = () => {
                                    <h5 className="text-sm font-black text-slate-800 uppercase">{wb.warehouseName}</h5>
                                 </div>
                                 <span className="text-[10px] font-black text-slate-400 font-mono">{wb.warehouseCode}</span>
+                             </div>
+                             <div className="flex items-end justify-between">
+                                <div>
+                                   <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Mevcut Stok</p>
+                                   <p className={`text-2xl font-black tracking-tighter ${wb.balance > 0 ? 'text-indigo-600' : 'text-slate-300'}`}>
+                                      {wb.balance.toLocaleString()}
+                                   </p>
+                                </div>
+                                <div className="text-right">
+                                   <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Birim</p>
+                                   <p className="text-xs font-bold text-slate-500 uppercase">ADET</p>
+                                </div>
                              </div>
                           </div>
                        ))}

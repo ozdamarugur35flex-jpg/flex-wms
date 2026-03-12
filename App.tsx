@@ -1,12 +1,14 @@
 
 import React, { useState } from 'react';
 import { HashRouter, Routes, Route, Link, useLocation } from 'react-router-dom';
+import { motion, AnimatePresence } from 'motion/react';
 import { 
   LayoutDashboard, FileStack, Target, ClipboardList, Calculator, PieChart, LayoutList, FileSpreadsheet, 
   UserPlus, ShieldCheck, Search, Bell, Database, Package, Users, Warehouse, LayoutGrid, Gauge, 
   MinusCircle, Layers, Tag, ShoppingCart, PackageSearch, Truck, Receipt, RefreshCcw, Factory, ArrowLeftRight, 
   History, Calendar, Printer, ChevronLeft, ChevronRight, Sparkles, FileText, FileUp, FileDown, 
-  CheckCircle2, Settings2, ShieldAlert, Archive, FilePlus, Clock, Hash, ArrowUpRight, FileJson, ArrowDownCircle
+  CheckCircle2, Settings2, ShieldAlert, Archive, FilePlus, Clock, Hash, ArrowUpRight, FileJson, ArrowDownCircle,
+  ChevronDown
 } from 'lucide-react';
 
 import Dashboard from './pages/Dashboard';
@@ -91,7 +93,23 @@ const FlexLogo: React.FC<{ collapsed?: boolean }> = ({ collapsed }) => (
 
 const AppContent: React.FC = () => {
   const [isSidebarOpen, setSidebarOpen] = useState(true);
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({
+    "Yapay Zeka": true,
+    "Kartlar & Tanımlar": false,
+    "Satınalma & Giriş": false,
+    "Satış & Sevkiyat": false,
+    "Depo & Üretim": false,
+    "Raporlar & Analiz": false,
+    "Sistem": false,
+  });
   const location = useLocation();
+
+  const toggleGroup = (title: string) => {
+    setExpandedGroups(prev => ({
+      ...prev,
+      [title]: !prev[title]
+    }));
+  };
 
   const menuGroups = [
     {
@@ -191,23 +209,47 @@ const AppContent: React.FC = () => {
           
           {menuGroups.map((group, gIdx) => (
             <div key={gIdx} className="space-y-1">
-              {isSidebarOpen && (
-                <p className="px-4 text-[10px] font-black text-slate-400 uppercase tracking-[0.15em] mb-2 mt-4 opacity-70">
-                  {group.title}
-                </p>
-              )}
-              {group.items.map((item) => (
-                <Link
-                  key={item.id}
-                  to={item.path}
-                  className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all group relative ${location.pathname === item.path ? 'bg-sky-600 text-white shadow-lg shadow-sky-100 font-medium' : 'text-slate-600 hover:bg-indigo-50 hover:text-indigo-600'}`}
+              {isSidebarOpen ? (
+                <button 
+                  onClick={() => toggleGroup(group.title)}
+                  className="w-full flex items-center justify-between px-4 py-2 text-[10px] font-black text-slate-400 uppercase tracking-[0.15em] mb-1 mt-4 opacity-70 hover:text-indigo-600 transition-colors group"
                 >
-                  <span className={location.pathname === item.path ? 'text-white' : 'text-slate-400 group-hover:text-indigo-600 transition-colors'}>
-                    {item.icon}
-                  </span>
-                  {isSidebarOpen && <span className="text-[13px] truncate">{item.label}</span>}
-                </Link>
-              ))}
+                  <span>{group.title}</span>
+                  <motion.div
+                    animate={{ rotate: expandedGroups[group.title] ? 0 : -90 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    <ChevronDown size={12} />
+                  </motion.div>
+                </button>
+              ) : (
+                <div className="h-px bg-slate-100 my-4 mx-4" />
+              )}
+              
+              <AnimatePresence initial={false}>
+                {(expandedGroups[group.title] || !isSidebarOpen) && (
+                  <motion.div
+                    initial={isSidebarOpen ? { height: 0, opacity: 0 } : false}
+                    animate={isSidebarOpen ? { height: 'auto', opacity: 1 } : false}
+                    exit={isSidebarOpen ? { height: 0, opacity: 0 } : false}
+                    transition={{ duration: 0.3, ease: "easeInOut" }}
+                    className="overflow-hidden space-y-1"
+                  >
+                    {group.items.map((item) => (
+                      <Link
+                        key={item.id}
+                        to={item.path}
+                        className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all group relative ${location.pathname === item.path ? 'bg-sky-600 text-white shadow-lg shadow-sky-100 font-medium' : 'text-slate-600 hover:bg-indigo-50 hover:text-indigo-600'}`}
+                      >
+                        <span className={location.pathname === item.path ? 'text-white' : 'text-slate-400 group-hover:text-indigo-600 transition-colors'}>
+                          {item.icon}
+                        </span>
+                        {isSidebarOpen && <span className="text-[13px] truncate">{item.label}</span>}
+                      </Link>
+                    ))}
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
           ))}
         </nav>

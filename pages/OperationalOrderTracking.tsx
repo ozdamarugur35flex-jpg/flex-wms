@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   Truck, 
   RotateCcw, 
@@ -17,30 +17,62 @@ import {
   LayoutList,
   Database,
   Hash,
-  ChevronDown
+  ChevronDown,
+  Loader2
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { OperationalOrderItem } from '../types';
-
-const mockOperationalOrders: OperationalOrderItem[] = [
-  { id: '1', date: '2024-03-21', branchName: 'Merkez Şube', customerName: 'Aksoy Metal Ltd.', stockCode: 'AL-2020', stockName: 'Alüminyum Profil 20x20', orderedQty: 1000, shippedQty: 1000, balance: 0, unit: 'ADET', status: 'Sevk Edildi' },
-  { id: '2', date: '2024-03-21', branchName: 'Fabrika-1', customerName: 'Yılmaz Lojistik', stockCode: 'SMN-M8', stockName: 'Çelik Somun M8', orderedQty: 5000, shippedQty: 2500, balance: 2500, unit: 'ADET', status: 'Kısmi Sevk' },
-  { id: '3', date: '2024-03-22', branchName: 'Merkez Şube', customerName: 'Aksoy Metal Ltd.', stockCode: 'PL-3030', stockName: 'Plastik Kapak 30x30', orderedQty: 200, shippedQty: 0, balance: 200, unit: 'ADET', status: 'Sevk Edilecek' },
-  { id: '4', date: '2024-03-22', branchName: 'Fabrika-2', customerName: 'Global Export', stockCode: 'AL-4040', stockName: 'Alüminyum Profil 40x40', orderedQty: 150, shippedQty: 150, balance: 0, unit: 'ADET', status: 'Sevk Edildi' },
-  { id: '5', date: '2024-03-23', branchName: 'Fabrika-1', customerName: 'Yılmaz Lojistik', stockCode: 'BND-45', stockName: 'Koli Bandı 45mm', orderedQty: 50, shippedQty: 0, balance: 50, unit: 'RULO', status: 'Sevk Edilecek' },
-];
+import { apiService } from '../api';
 
 const OperationalOrderTracking: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'list' | 'daily'>('list');
   const [isSidebarOpen, setSidebarOpen] = useState(true);
-  const [dates, setDates] = useState({ start: '2024-03-01', end: '2024-03-31' });
+  const [dates, setDates] = useState({ start: '2024-03-01', end: '2024-12-31' });
   const [selectedBranch, setSelectedBranch] = useState('Tümü');
   const [searchTerm, setSearchTerm] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [orders, setOrders] = useState<OperationalOrderItem[]>([]);
 
   const branches = ['Tümü', 'Merkez Şube', 'Fabrika-1', 'Fabrika-2', 'Lojistik Depo'];
 
+  const loadOrders = async () => {
+    try {
+      setLoading(true);
+      const data = await apiService.shipmentOrders.getAll();
+      // Map API data to OperationalOrderItem if needed, although api.ts mapper might already handle it
+      // The mapper in api.ts for shipmentOrders returns:
+      // { id, durum, sevkEmriNo, sipInckeyNo, miktar, depo, stokKodu, stokAdi, cariIsim }
+      // But OperationalOrderItem expects:
+      // { id, date, branchName, customerName, stockCode, stockName, orderedQty, shippedQty, balance, unit, status }
+      
+      const mappedData: OperationalOrderItem[] = data.map((item: any) => ({
+        id: item.id || Math.random().toString(),
+        date: item.date || new Date().toISOString().split('T')[0],
+        branchName: item.branchName || (item.depo === 1 ? 'Merkez Şube' : 'Diğer'),
+        customerName: item.cariIsim || item.customerName || 'Bilinmeyen Müşteri',
+        stockCode: item.stokKodu || item.stockCode || '',
+        stockName: item.stokAdi || item.stockName || '',
+        orderedQty: item.miktar || item.orderedQty || 0,
+        shippedQty: item.shippedQty || (item.durum === 'S' ? item.miktar : 0),
+        balance: item.balance ?? (item.durum === 'S' ? 0 : item.miktar),
+        unit: item.unit || 'ADET',
+        status: item.status || (item.durum === 'S' ? 'Sevk Edildi' : 'Sevk Bekliyor')
+      }));
+
+      setOrders(mappedData);
+    } catch (error) {
+      console.error("Siparişler yüklenemedi", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadOrders();
+  }, []);
+
   const filteredData = useMemo(() => {
-    return mockOperationalOrders.filter(item => {
+    return orders.filter(item => {
       const matchBranch = selectedBranch === 'Tümü' || item.branchName === selectedBranch;
       const matchSearch = item.stockName.toLowerCase().includes(searchTerm.toLowerCase()) ||
                           item.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -52,7 +84,7 @@ const OperationalOrderTracking: React.FC = () => {
       
       return matchBranch && matchSearch && matchDate;
     });
-  }, [selectedBranch, searchTerm, dates]);
+  }, [selectedBranch, searchTerm, dates, orders]);
 
   const handleExportExcel = () => {
     const exportData = filteredData.map(item => ({
@@ -189,7 +221,14 @@ const OperationalOrderTracking: React.FC = () => {
         {/* VERİ TABLOSU */}
         <div className="flex-1 bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden flex flex-col relative">
            
-           {activeTab === 'list' && (
+           {loading ? (
+              <div className="flex-1 flex items-center justify-center">
+                 <div className="flex flex-col items-center gap-4">
+                    <Loader2 className="w-12 h-12 text-indigo-600 animate-spin" />
+                    <p className="text-sm font-black text-slate-400 uppercase tracking-widest">Siparişler Yükleniyor...</p>
+                 </div>
+              </div>
+           ) : activeTab === 'list' ? (
               <div className="flex-1 overflow-auto custom-scrollbar animate-in slide-in-from-bottom-4 duration-500">
                  <table className="w-full text-left border-collapse min-w-[1200px]">
                     <thead className="sticky top-0 z-10 bg-slate-900 text-white text-[10px] font-black uppercase tracking-[0.2em]">
@@ -254,9 +293,7 @@ const OperationalOrderTracking: React.FC = () => {
                     </tbody>
                  </table>
               </div>
-           )}
-
-           {activeTab === 'daily' && (
+           ) : (
               <div className="flex-1 overflow-auto custom-scrollbar p-8 bg-slate-50/50 space-y-12 animate-in slide-in-from-right-4 duration-500">
                  {dailyGroups.map(([date, items]) => (
                     <div key={date} className="space-y-4">

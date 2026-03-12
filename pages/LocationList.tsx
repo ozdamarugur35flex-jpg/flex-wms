@@ -50,6 +50,29 @@ const LocationList: React.FC = () => {
     }
   };
 
+  const handleAddLocation = () => {
+    if (!formData.cellCode) {
+      alert("Hücre kodu girmelisiniz!");
+      return;
+    }
+    
+    const newLoc: StorageLocation = {
+      id: Math.random().toString(36).substr(2, 9),
+      cellCode: formData.cellCode,
+      warehouseCode: formData.warehouse,
+      status: 'Boş',
+      fillRate: 0
+    };
+
+    setLocations([newLoc, ...locations]);
+    setFormData({ ...formData, cellCode: '' });
+    alert("Yeni hücre listeye eklendi (Kaydet butonuna basarak kalıcı hale getirebilirsiniz).");
+  };
+
+  const handleSaveAll = () => {
+    alert("Tüm hücre değişiklikleri Netsis sistemine aktarıldı (Simülasyon).");
+  };
+
   const filteredLocations = locations.filter(l => 
     (l.cellCode?.toLowerCase() || '').includes(searchTerm.toLowerCase()) || 
     (l.warehouseCode?.toLowerCase() || '').includes(searchTerm.toLowerCase())
@@ -69,10 +92,16 @@ const LocationList: React.FC = () => {
         </div>
         
         <div className="flex items-center gap-2">
-          <button className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-600 rounded-xl text-xs font-bold hover:bg-slate-50 transition-all active:scale-95">
+          <button 
+            onClick={() => setFormData({ warehouse: '01', cellCode: '' })}
+            className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-600 rounded-xl text-xs font-bold hover:bg-slate-50 transition-all active:scale-95"
+          >
             <Plus size={16} className="text-sky-600" /> Yeni
           </button>
-          <button className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-600 rounded-xl text-xs font-bold hover:bg-slate-50 transition-all active:scale-95">
+          <button 
+            onClick={handleSaveAll}
+            className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-600 rounded-xl text-xs font-bold hover:bg-slate-50 transition-all active:scale-95"
+          >
             <Save size={16} className="text-emerald-600" /> Kaydet
           </button>
           <div className="w-[1px] h-6 bg-slate-200 mx-1" />
@@ -111,7 +140,10 @@ const LocationList: React.FC = () => {
             onChange={(e) => setFormData({...formData, cellCode: e.target.value})}
           />
         </div>
-        <button className="bg-sky-600 text-white py-2.5 rounded-xl text-xs font-black hover:bg-sky-700 transition-all shadow-lg flex items-center justify-center gap-2 uppercase tracking-widest active:scale-95">
+        <button 
+          onClick={handleAddLocation}
+          className="bg-sky-600 text-white py-2.5 rounded-xl text-xs font-black hover:bg-sky-700 transition-all shadow-lg flex items-center justify-center gap-2 uppercase tracking-widest active:scale-95"
+        >
           <ArrowRightCircle size={16} /> Ekle
         </button>
       </div>

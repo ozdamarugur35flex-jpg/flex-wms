@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   Database, 
   RotateCcw, 
@@ -19,9 +19,11 @@ import {
   TrendingUp,
   Tag,
   ArrowRightCircle,
-  LayoutGrid
+  LayoutGrid,
+  Loader2
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
+import { apiService } from '../api';
 
 interface WarehouseStock {
   id: string;
@@ -37,32 +39,41 @@ interface WarehouseStock {
   totalBalance: number;
 }
 
-const WAREHOUSES = [
-  { code: '10', name: 'Ana Depo' },
-  { code: '40', name: 'Red Depo' },
-  { code: '50', name: 'Sevk Depo' },
-  { code: '88', name: 'Fabrika-2' },
-];
-
-const mockData: WarehouseStock[] = [
-  { id: '1', stockCode: 'AL-2020', stockName: 'Alüminyum Profil 20x20', unit: 'ADET', groupCode: 'HAMMADDE', category1: 'METAL', supplier: 'Aksoy Metal', lastPurchasePrice: 120.50, salesPrice: 185.00, totalBalance: 1500, warehouseBalances: { '10': 1000, '40': 0, '50': 500, '88': 0 } },
-  { id: '2', stockCode: 'SMN-M8', stockName: 'Çelik Somun M8', unit: 'ADET', groupCode: 'BAĞLANTI', category1: 'HIRDAVAT', supplier: 'Civata Dünyası', lastPurchasePrice: 1.25, salesPrice: 2.10, totalBalance: 15500, warehouseBalances: { '10': 10000, '40': 500, '50': 5000, '88': 0 } },
-  { id: '3', stockCode: 'PL-3030', stockName: 'Plastik Kapak 30x30', unit: 'ADET', groupCode: 'MAMUL', category1: 'PLASTİK', supplier: 'Global Plastik', lastPurchasePrice: 4.80, salesPrice: 8.50, totalBalance: 2400, warehouseBalances: { '10': 400, '40': 0, '50': 2000, '88': 0 } },
-  { id: '4', stockCode: 'BND-45', stockName: 'Koli Bandı 45mm', unit: 'RULO', groupCode: 'SARF', category1: 'AMBALAJ', supplier: 'Ambalaj Market', lastPurchasePrice: 25.00, salesPrice: 42.00, totalBalance: 150, warehouseBalances: { '10': 150, '40': 0, '50': 0, '88': 0 } },
-];
-
 const WarehouseBalanceReport: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'pivot' | 'detail'>('pivot');
   const [searchTerm, setSearchTerm] = useState('');
   const [showValues, setShowValues] = useState(true);
+  const [data, setData] = useState<WarehouseStock[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [warehouses, setWarehouses] = useState<{code: string, name: string}[]>([]);
+
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      const [balanceData, warehouseData] = await Promise.all([
+        apiService.reports.getWarehouseBalances(),
+        apiService.warehouses.getAll()
+      ]);
+      setData(balanceData);
+      setWarehouses(warehouseData);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadData();
+  }, []);
 
   const filteredData = useMemo(() => {
-    return mockData.filter(item => 
-      item.stockName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.stockCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.category1.toLowerCase().includes(searchTerm.toLowerCase())
+    return data.filter(item => 
+      (item.stockName?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+      (item.stockCode?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+      (item.category1?.toLowerCase() || '').includes(searchTerm.toLowerCase())
     );
-  }, [searchTerm]);
+  }, [searchTerm, data]);
 
   const handleExportExcel = () => {
     const worksheet = XLSX.utils.json_to_sheet(filteredData);
@@ -110,8 +121,8 @@ const WarehouseBalanceReport: React.FC = () => {
               </button>
            </div>
 
-          <button className="flex items-center gap-2 px-4 py-2.5 bg-indigo-50 text-indigo-600 rounded-xl text-xs font-black hover:bg-indigo-100 transition-all active:scale-95">
-            <RotateCcw size={16} /> LİSTELE
+          <button onClick={loadData} className="flex items-center gap-2 px-4 py-2.5 bg-indigo-50 text-indigo-600 rounded-xl text-xs font-black hover:bg-indigo-100 transition-all active:scale-95">
+            <RotateCcw size={16} className={loading ? 'animate-spin' : ''} /> LİSTELE
           </button>
           <button 
             onClick={handleExportExcel}
@@ -168,15 +179,19 @@ const WarehouseBalanceReport: React.FC = () => {
       <div className="flex-1 bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden flex flex-col relative">
          
          <div className="flex-1 overflow-auto custom-scrollbar">
-            {activeTab === 'pivot' ? (
+            {loading ? (
+              <div className="h-full flex items-center justify-center">
+                <Loader2 className="w-10 h-10 text-indigo-600 animate-spin" />
+              </div>
+            ) : activeTab === 'pivot' ? (
                <table className="w-full text-left border-collapse min-w-[1500px] animate-in slide-in-from-left-4 duration-500">
                   <thead className="sticky top-0 z-10">
                      <tr className="bg-slate-900 text-white text-[10px] font-black uppercase tracking-[0.2em]">
                         <th className="px-8 py-5 border-r border-white/5 sticky left-0 z-30 bg-slate-950 w-[300px]">Stok Kartı / Ürün</th>
                         <th className="px-6 py-5 border-r border-white/5 text-center w-32">Kategori 1</th>
                         <th className="px-6 py-5 border-r border-white/5 text-center w-20">Birim</th>
-                        {WAREHOUSES.map(w => (
-                           <th key={w.code} className="px-6 py-5 border-r border-white/5 text-center min-w-[1200px]">
+                        {warehouses.map(w => (
+                           <th key={w.code} className="px-6 py-5 border-r border-white/5 text-center min-w-[120px]">
                               <div className="flex flex-col items-center">
                                  <span className="text-indigo-400 mb-1">{w.name}</span>
                                  <span className="text-[8px] opacity-40 font-mono">KOD: {w.code}</span>
@@ -205,7 +220,7 @@ const WarehouseBalanceReport: React.FC = () => {
                               <span className="px-2 py-1 bg-slate-100 text-slate-600 rounded border border-slate-200 text-[9px] font-black uppercase tracking-widest">{item.category1}</span>
                            </td>
                            <td className="px-6 py-5 text-center text-[10px] font-black text-slate-400 uppercase">{item.unit}</td>
-                           {WAREHOUSES.map(w => {
+                           {warehouses.map(w => {
                               const balance = item.warehouseBalances[w.code] || 0;
                               return (
                                  <td key={w.code} className={`px-6 py-5 text-center ${balance > 0 ? 'bg-indigo-50/20' : ''}`}>

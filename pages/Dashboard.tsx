@@ -9,19 +9,22 @@ const Dashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<any>(null);
   const [chartData, setChartData] = useState([]);
+  const [logs, setLogs] = useState<any[]>([]);
 
   useEffect(() => {
     const loadDashboardData = async () => {
       try {
         setLoading(true);
         // Backend henüz hazır değilse mock veriye düşmesi için try-catch
-        const [statsRes, chartsRes] = await Promise.all([
+        const [statsRes, chartsRes, logsRes] = await Promise.all([
           apiService.dashboard.getStats().catch(() => null),
-          apiService.dashboard.getCharts().catch(() => [])
+          apiService.dashboard.getCharts().catch(() => []),
+          apiService.dashboard.getLogs().catch(() => [])
         ]);
         
         if (statsRes) setStats(statsRes);
         if (chartsRes.length > 0) setChartData(chartsRes);
+        if (logsRes.length > 0) setLogs(logsRes);
       } catch (err) {
         console.error("Dashboard verisi yüklenemedi", err);
       } finally {
@@ -53,23 +56,23 @@ const Dashboard: React.FC = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard 
           label="Toplam Stok Değeri" 
-          value={stats?.totalStockValue || "₺1,245,000"} 
-          change="+12.5%" trend="up" icon={<Package className="text-sky-600" />} color="bg-sky-50" 
+          value={stats?.totalStockValue || "0"} 
+          change={stats?.totalStockValueChange || "0%"} trend={stats?.totalStockValueTrend || "up"} icon={<Package className="text-sky-600" />} color="bg-sky-50" 
         />
         <StatCard 
           label="Bekleyen Sevk Emri" 
-          value={stats?.pendingShipments || "48"} 
-          change="-5.2%" trend="down" icon={<Truck className="text-amber-600" />} color="bg-amber-50" 
+          value={stats?.pendingShipments || "0"} 
+          change={stats?.pendingShipmentsChange || "0%"} trend={stats?.pendingShipmentsTrend || "down"} icon={<Truck className="text-amber-600" />} color="bg-amber-50" 
         />
         <StatCard 
           label="Günlük Satış" 
-          value={stats?.dailySales || "₺24,500"} 
-          change="+8.1%" trend="up" icon={<ShoppingCart className="text-emerald-600" />} color="bg-emerald-50" 
+          value={stats?.dailySales || "0"} 
+          change={stats?.dailySalesChange || "0%"} trend={stats?.dailySalesTrend || "up"} icon={<ShoppingCart className="text-emerald-600" />} color="bg-emerald-50" 
         />
         <StatCard 
           label="Kritik Stok" 
-          value={stats?.criticalStockCount || "12"} 
-          change="+2" trend="up" icon={<AlertTriangle className="text-rose-600" />} color="bg-rose-50" 
+          value={stats?.criticalStockCount || "0"} 
+          change={stats?.criticalStockChange || "0"} trend={stats?.criticalStockTrend || "up"} icon={<AlertTriangle className="text-rose-600" />} color="bg-rose-50" 
         />
       </div>
 
@@ -78,7 +81,7 @@ const Dashboard: React.FC = () => {
           <h3 className="font-bold text-slate-800 mb-6 uppercase tracking-widest text-xs">Haftalık Hareket Analizi</h3>
           <div className="h-80 w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData.length > 0 ? chartData : defaultData}>
+              <BarChart data={chartData}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                 <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 10, fill: '#94a3b8'}} />
                 <YAxis axisLine={false} tickLine={false} tick={{fontSize: 10, fill: '#94a3b8'}} />
@@ -92,7 +95,15 @@ const Dashboard: React.FC = () => {
         <div className="bg-slate-900 p-8 rounded-[2.5rem] text-white shadow-xl relative overflow-hidden">
            <h3 className="font-bold mb-6 uppercase tracking-widest text-xs text-indigo-400">Son Sistem Logları</h3>
            <div className="space-y-4 relative z-10">
-              {[1,2,3,4].map(i => (
+              {logs.length > 0 ? logs.map((log, i) => (
+                <div key={i} className="flex items-center justify-between p-3 bg-white/5 rounded-2xl border border-white/5 hover:bg-white/10 transition-all cursor-default">
+                   <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-indigo-500/20 flex items-center justify-center text-indigo-400"><LucideHistory size={16}/></div>
+                      <span className="text-xs font-medium">{log.message || log.title}</span>
+                   </div>
+                   <span className="text-[10px] text-slate-500 font-bold uppercase tracking-tighter">{log.time || log.date}</span>
+                </div>
+              )) : [1,2,3,4].map(i => (
                 <div key={i} className="flex items-center justify-between p-3 bg-white/5 rounded-2xl border border-white/5 hover:bg-white/10 transition-all cursor-default">
                    <div className="flex items-center gap-3">
                       <div className="w-8 h-8 rounded-lg bg-indigo-500/20 flex items-center justify-center text-indigo-400"><LucideHistory size={16}/></div>
@@ -108,14 +119,6 @@ const Dashboard: React.FC = () => {
     </div>
   );
 };
-
-const defaultData = [
-  { name: 'Pzt', satis: 4000, alis: 2400 },
-  { name: 'Sal', satis: 3000, alis: 1398 },
-  { name: 'Çar', satis: 2000, alis: 9800 },
-  { name: 'Per', satis: 2780, alis: 3908 },
-  { name: 'Cum', satis: 1890, alis: 4800 },
-];
 
 const StatCard: React.FC<{ label: string, value: string | number, change: string, trend: 'up' | 'down', icon: React.ReactNode, color: string }> = ({ label, value, change, trend, icon, color }) => (
   <div className="bg-white p-6 rounded-[2rem] border border-slate-200 shadow-sm flex flex-col justify-between hover:shadow-lg transition-all group">

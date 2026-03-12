@@ -26,29 +26,54 @@ import {
   ArrowDownCircle,
   Hash,
   Tag,
-  // Added MoreHorizontal to fix the "Cannot find name 'MoreHorizontal'" error
-  MoreHorizontal
+  MoreHorizontal,
+  Loader2
 } from 'lucide-react';
 import { ProductionRecord, DepotMaterialStatus } from '../types';
-
-const mockProductions: ProductionRecord[] = [
-  { id: '1', slipNo: 'URT2024001', date: '2024-03-21', stockCode: 'AL-2020', stockName: 'Alüminyum Profil 20x20', serialNo: 'SR-2024-X01', quantity: 120, unit: 'ADET', machine: 'CNC-01', operator: 'Mustafa A.', jobOrderNo: 'İE-9901' },
-  { id: '2', slipNo: 'URT2024002', date: '2024-03-21', stockCode: 'SMN-M8', stockName: 'Çelik Somun M8', serialNo: 'SR-2024-S55', quantity: 5000, unit: 'ADET', machine: 'PRES-05', operator: 'Ahmet Y.', jobOrderNo: 'İE-9902' },
-];
-
-const mockMaterialStatus: DepotMaterialStatus[] = [
-  { id: 'M1', stockCode: 'HAM-001', stockName: 'Hammadde Alüminyum Billet', unit: 'KG', requiredQty: 250, depotQty: 180, difference: -70 },
-  { id: 'M2', stockCode: 'BOYA-05', stockName: 'Elektrostatik Toz Boya', unit: 'KG', requiredQty: 10, depotQty: 45, difference: 35 },
-];
+import { apiService } from '../api';
 
 const ProductionRecordPage: React.FC = () => {
-  const [productions, setProductions] = useState<ProductionRecord[]>(mockProductions);
-  const [materialStatus, setMaterialStatus] = useState<DepotMaterialStatus[]>(mockMaterialStatus);
+  const [productions, setProductions] = useState<ProductionRecord[]>([]);
+  const [materialStatus, setMaterialStatus] = useState<DepotMaterialStatus[]>([]);
   const [activeTab, setActiveTab] = useState<'list' | 'materials'>('list');
   const [labelQty, setLabelQty] = useState<number>(0);
   const [labelCount, setLabelCount] = useState<number>(1);
+  const [loading, setLoading] = useState(false);
+  const [selectedJobOrder, setSelectedJobOrder] = useState('');
   
   const totalQty = useMemo(() => labelQty * labelCount, [labelQty, labelCount]);
+
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      const data = await apiService.production.getAll();
+      setProductions(data);
+    } catch (error) {
+      console.error("Üretim kayıtları yüklenemedi", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const loadMaterialStatus = async (jobOrder: string) => {
+    if (!jobOrder) return;
+    try {
+      const data = await apiService.production.getMaterialStatus(jobOrder);
+      setMaterialStatus(data);
+    } catch (error) {
+      console.error("Malzeme durumu yüklenemedi", error);
+    }
+  };
+
+  useEffect(() => {
+    if (selectedJobOrder) {
+      loadMaterialStatus(selectedJobOrder);
+    }
+  }, [selectedJobOrder]);
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
@@ -130,9 +155,15 @@ const ProductionRecordPage: React.FC = () => {
                         <Hash size={12} className="text-indigo-500" /> İş Emri No (grdLueIsemriNo)
                      </label>
                      <div className="relative group">
-                        <select className="w-full px-5 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-black text-slate-800 outline-none focus:ring-4 focus:ring-indigo-500/5 focus:border-indigo-500 appearance-none transition-all">
-                           <option>İE-2024-001 | AL-2020</option>
-                           <option>İE-2024-002 | SMN-M8</option>
+                        <select 
+                           className="w-full px-5 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-black text-slate-800 outline-none focus:ring-4 focus:ring-indigo-500/5 focus:border-indigo-500 appearance-none transition-all"
+                           value={selectedJobOrder}
+                           onChange={(e) => setSelectedJobOrder(e.target.value)}
+                        >
+                           <option value="">İş Emri Seçiniz...</option>
+                           {productions.map(p => (
+                              <option key={p.id} value={p.jobOrderNo}>{p.jobOrderNo} | {p.stockCode}</option>
+                           ))}
                         </select>
                         <Search size={18} className="absolute right-5 top-1/2 -translate-y-1/2 text-slate-300 group-hover:text-indigo-500 transition-colors" />
                      </div>
@@ -150,8 +181,10 @@ const ProductionRecordPage: React.FC = () => {
                      <Box size={12} className="text-indigo-500" /> Üretilen Stok (grdLueStok)
                   </label>
                   <select className="w-full px-5 py-3 bg-indigo-50/30 border border-indigo-100 rounded-2xl text-sm font-black text-indigo-900 outline-none">
-                     <option>AL-2020 | Alüminyum Profil 20x20</option>
-                     <option>SMN-M8 | Çelik Somun M8</option>
+                     <option value="">Stok Seçiniz...</option>
+                     {productions.map(p => (
+                        <option key={p.id} value={p.stockCode}>{p.stockCode} | {p.stockName}</option>
+                     ))}
                   </select>
                </div>
             </div>
@@ -220,7 +253,14 @@ const ProductionRecordPage: React.FC = () => {
             </button>
          </div>
 
-         {activeTab === 'list' ? (
+         {loading ? (
+            <div className="flex-1 flex items-center justify-center py-20">
+               <div className="flex flex-col items-center gap-4">
+                  <Loader2 className="w-12 h-12 text-indigo-600 animate-spin" />
+                  <p className="text-sm font-black text-slate-400 uppercase tracking-widest">Veriler Yükleniyor...</p>
+               </div>
+            </div>
+         ) : activeTab === 'list' ? (
             <div className="overflow-x-auto">
                <table className="w-full text-left border-collapse">
                   <thead>

@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   History, 
   RotateCcw, 
@@ -22,46 +22,76 @@ import {
   PackageCheck,
   Calendar,
   Warehouse as WarehouseIcon,
-  Info
+  Info,
+  Loader2
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { StockListItem, StockMovementReportItem, StockWarehouseBalance } from '../types';
-
-const mockStocks: StockListItem[] = [
-  { id: '1', code: 'AL-2020', name: 'Alüminyum Profil 20x20', groupCode: 'HAM', unit: 'ADET' },
-  { id: '2', code: 'SMN-M8', name: 'Çelik Somun M8', groupCode: 'BGL', unit: 'ADET' },
-  { id: '3', code: 'PL-3030', name: 'Plastik Kapak 30x30', groupCode: 'MML', unit: 'ADET' },
-  { id: '4', code: 'BND-45', name: 'Koli Bandı 45mm', groupCode: 'SRF', unit: 'RULO' },
-];
-
-const mockMovements: StockMovementReportItem[] = [
-  { id: 'm1', year: '2024', date: '2024-03-20', slipNo: 'IRS-1001', type: 'Alış', price: 12.50, inQty: 1000, outQty: 0, balance: 1000, description: 'Aksoy Metal Alım', warehouseCode: '01', customerName: 'Aksoy Metal Ltd.' },
-  { id: 'm2', year: '2024', date: '2024-03-21', slipNo: 'URT-505', type: 'Üretim', price: 0, inQty: 0, outQty: 250, balance: 750, description: 'İş Emri Üretim Çıkış', warehouseCode: '01', customerName: 'Dahili Üretim' },
-  { id: 'm3', year: '2024', date: '2024-03-22', slipNo: 'SIF-001', type: 'Düzeltme', price: 0, inQty: 50, outQty: 0, balance: 800, description: 'Sayım Farkı Giriş', warehouseCode: '01', customerName: 'Sistem' },
-  { id: 'm4', year: '2024', date: '2024-03-24', slipNo: 'SAT-9901', type: 'Satış', price: 18.20, inQty: 0, outQty: 150, balance: 650, description: 'Yılmaz Sanayi Sevk', warehouseCode: '01', customerName: 'Yılmaz Sanayi A.Ş.' },
-];
-
-const mockBalances: StockWarehouseBalance[] = [
-  { id: 'b1', warehouseCode: '01', warehouseName: 'Merkez Depo', balance: 600 },
-  { id: 'b2', warehouseCode: '02', warehouseName: 'Hammadde Depo', balance: 50 },
-  { id: 'b3', warehouseCode: '03', warehouseName: 'Fason Depo', balance: 0 },
-];
+import { apiService } from '../api';
 
 const StockMovementReport: React.FC = () => {
-  const [selectedStock, setSelectedStock] = useState<StockListItem>(mockStocks[0]);
+  const [stocks, setStocks] = useState<StockListItem[]>([]);
+  const [selectedStock, setSelectedStock] = useState<StockListItem | null>(null);
+  const [movements, setMovements] = useState<StockMovementReportItem[]>([]);
+  const [balances, setBalances] = useState<StockWarehouseBalance[]>([]);
   const [activeTab, setActiveTab] = useState<'movements' | 'balances'>('movements');
   const [searchTerm, setSearchTerm] = useState('');
   const [isSidebarOpen, setSidebarOpen] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [stocksLoading, setStocksLoading] = useState(true);
+
+  const loadStocks = async () => {
+    setStocksLoading(true);
+    try {
+      const data = await apiService.stocks.getAll();
+      setStocks(data);
+      if (data.length > 0 && !selectedStock) {
+        setSelectedStock(data[0]);
+      }
+    } catch (error) {
+      console.error('Stoklar yüklenirken hata:', error);
+    } finally {
+      setStocksLoading(false);
+    }
+  };
+
+  const loadReportData = async () => {
+    if (!selectedStock) return;
+    setLoading(true);
+    try {
+      const [movementsData, balancesData] = await Promise.all([
+        apiService.reports.getStockMovements([selectedStock.code], '', ''),
+        apiService.reports.getStockWarehouseBalances([selectedStock.code])
+      ]);
+      setMovements(movementsData);
+      setBalances(balancesData);
+    } catch (error) {
+      console.error('Rapor verileri yüklenirken hata:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadStocks();
+  }, []);
+
+  useEffect(() => {
+    if (selectedStock) {
+      loadReportData();
+    }
+  }, [selectedStock]);
 
   const filteredStocks = useMemo(() => {
-    return mockStocks.filter(s => 
-      s.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-      s.code.toLowerCase().includes(searchTerm.toLowerCase())
+    return stocks.filter(s => 
+      (s.name?.toLowerCase() || '').includes(searchTerm.toLowerCase()) || 
+      (s.code?.toLowerCase() || '').includes(searchTerm.toLowerCase())
     );
-  }, [searchTerm]);
+  }, [stocks, searchTerm]);
 
   const handleExportExcel = () => {
-    const dataToExport = activeTab === 'movements' ? mockMovements.map(m => ({
+    if (!selectedStock) return;
+    const dataToExport = activeTab === 'movements' ? movements.map(m => ({
       'Yıl': m.year,
       'Tarih': m.date,
       'Fiş/İrsaliye No': m.slipNo,
@@ -73,7 +103,7 @@ const StockMovementReport: React.FC = () => {
       'Depo Kodu': m.warehouseCode,
       'Cari Ünvanı': m.customerName,
       'Açıklama': m.description
-    })) : mockBalances.map(b => ({
+    })) : balances.map(b => ({
       'Depo Kodu': b.warehouseCode,
       'Depo Adı': b.warehouseName,
       'Mevcut Bakiye': b.balance
@@ -86,13 +116,15 @@ const StockMovementReport: React.FC = () => {
   };
 
   const handleNextStock = () => {
-    const currentIndex = mockStocks.findIndex(s => s.id === selectedStock.id);
-    if (currentIndex < mockStocks.length - 1) setSelectedStock(mockStocks[currentIndex + 1]);
+    if (!selectedStock) return;
+    const currentIndex = stocks.findIndex(s => s.code === selectedStock.code);
+    if (currentIndex < stocks.length - 1) setSelectedStock(stocks[currentIndex + 1]);
   };
 
   const handlePrevStock = () => {
-    const currentIndex = mockStocks.findIndex(s => s.id === selectedStock.id);
-    if (currentIndex > 0) setSelectedStock(mockStocks[currentIndex - 1]);
+    if (!selectedStock) return;
+    const currentIndex = stocks.findIndex(s => s.code === selectedStock.code);
+    if (currentIndex > 0) setSelectedStock(stocks[currentIndex - 1]);
   };
 
   return (
@@ -132,15 +164,17 @@ const StockMovementReport: React.FC = () => {
                </div>
 
                <div className="flex-1 overflow-y-auto custom-scrollbar p-2 space-y-1">
-                  {filteredStocks.map(stock => (
+                  {stocksLoading ? (
+                    <div className="flex justify-center py-10"><Loader2 className="animate-spin text-indigo-600" /></div>
+                  ) : filteredStocks.map(stock => (
                      <div 
-                        key={stock.id}
+                        key={stock.id || stock.code}
                         onClick={() => setSelectedStock(stock)}
-                        className={`p-4 rounded-2xl border transition-all cursor-pointer flex flex-col gap-2 group ${selectedStock.id === stock.id ? 'bg-indigo-600 border-indigo-600 text-white shadow-xl shadow-indigo-100' : 'bg-white border-slate-100 text-slate-600 hover:border-indigo-200 hover:bg-indigo-50/30'}`}
+                        className={`p-4 rounded-2xl border transition-all cursor-pointer flex flex-col gap-2 group ${selectedStock?.code === stock.code ? 'bg-indigo-600 border-indigo-600 text-white shadow-xl shadow-indigo-100' : 'bg-white border-slate-100 text-slate-600 hover:border-indigo-200 hover:bg-indigo-50/30'}`}
                      >
                         <div className="flex items-center justify-between">
-                           <span className={`text-[10px] font-black uppercase tracking-widest ${selectedStock.id === stock.id ? 'text-indigo-200' : 'text-slate-400'}`}>{stock.code}</span>
-                           <span className={`px-1.5 py-0.5 rounded text-[8px] font-black border ${selectedStock.id === stock.id ? 'bg-white/10 border-white/20' : 'bg-slate-50 border-slate-100'}`}>{stock.groupCode}</span>
+                           <span className={`text-[10px] font-black uppercase tracking-widest ${selectedStock?.code === stock.code ? 'text-indigo-200' : 'text-slate-400'}`}>{stock.code}</span>
+                           <span className={`px-1.5 py-0.5 rounded text-[8px] font-black border ${selectedStock?.code === stock.code ? 'bg-white/10 border-white/20' : 'bg-slate-50 border-slate-100'}`}>{stock.groupCode}</span>
                         </div>
                         <p className="text-xs font-black tracking-tight leading-tight uppercase line-clamp-2">{stock.name}</p>
                      </div>
@@ -195,8 +229,11 @@ const StockMovementReport: React.FC = () => {
                     <ChevronRight size={18} />
                  </button>
               </div>
-              <button className="flex items-center gap-2 px-6 py-2.5 bg-indigo-600 text-white rounded-xl text-xs font-black shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all active:scale-95">
-                 <RotateCcw size={16} /> LİSTELE
+              <button 
+                onClick={loadReportData}
+                className="flex items-center gap-2 px-6 py-2.5 bg-indigo-600 text-white rounded-xl text-xs font-black shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all active:scale-95"
+              >
+                 <RotateCcw size={16} className={loading ? 'animate-spin' : ''} /> LİSTELE
               </button>
               <button 
                 onClick={handleExportExcel}
@@ -212,29 +249,37 @@ const StockMovementReport: React.FC = () => {
         </div>
 
         <div className="bg-slate-900 px-8 py-4 rounded-3xl text-white flex items-center justify-between relative overflow-hidden shadow-2xl">
-           <div className="flex items-center gap-6 relative z-10">
-              <div className="w-14 h-14 bg-white/10 rounded-2xl flex items-center justify-center text-indigo-400 backdrop-blur-md border border-white/5">
-                 <PackageCheck size={32} />
-              </div>
-              <div>
-                 <div className="flex items-center gap-3 mb-1">
-                    <span className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.2em]">Analizi Yapılan Stok</span>
-                    <div className="w-1 h-1 rounded-full bg-indigo-500" />
-                    <span className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">{selectedStock.groupCode} GRUBU</span>
-                 </div>
-                 <div className="flex items-baseline gap-4">
-                    <h2 className="text-xl font-black tracking-tight">{selectedStock.name}</h2>
-                    <span className="text-xs font-mono font-bold text-indigo-300 px-2 py-0.5 bg-white/5 rounded border border-white/10 uppercase">{selectedStock.code}</span>
-                 </div>
-              </div>
-           </div>
-           <div className="text-right relative z-10">
-              <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Genel Bakiye (Net)</p>
-              <div className="flex items-end gap-2 justify-end">
-                 <h3 className="text-3xl font-black tracking-tighter text-emerald-400">{mockMovements[mockMovements.length-1].balance.toLocaleString()}</h3>
-                 <span className="text-xs font-black text-slate-400 mb-1.5">{selectedStock.unit}</span>
-              </div>
-           </div>
+           {selectedStock ? (
+             <>
+               <div className="flex items-center gap-6 relative z-10">
+                  <div className="w-14 h-14 bg-white/10 rounded-2xl flex items-center justify-center text-indigo-400 backdrop-blur-md border border-white/5">
+                     <PackageCheck size={32} />
+                  </div>
+                  <div>
+                     <div className="flex items-center gap-3 mb-1">
+                        <span className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.2em]">Analizi Yapılan Stok</span>
+                        <div className="w-1 h-1 rounded-full bg-indigo-500" />
+                        <span className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">{selectedStock.groupCode} GRUBU</span>
+                     </div>
+                     <div className="flex items-baseline gap-4">
+                        <h2 className="text-xl font-black tracking-tight">{selectedStock.name}</h2>
+                        <span className="text-xs font-mono font-bold text-indigo-300 px-2 py-0.5 bg-white/5 rounded border border-white/10 uppercase">{selectedStock.code}</span>
+                     </div>
+                  </div>
+               </div>
+               <div className="text-right relative z-10">
+                  <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Genel Bakiye (Net)</p>
+                  <div className="flex items-end gap-2 justify-end">
+                     <h3 className="text-3xl font-black tracking-tighter text-emerald-400">
+                        {movements.length > 0 ? movements[movements.length-1].balance.toLocaleString() : '0'}
+                     </h3>
+                     <span className="text-xs font-black text-slate-400 mb-1.5">{selectedStock.unit}</span>
+                  </div>
+               </div>
+             </>
+           ) : (
+             <div className="flex-1 text-center py-4 text-slate-500 font-bold uppercase tracking-widest">Stok Seçiniz</div>
+           )}
            <div className="absolute top-0 right-0 p-8 opacity-5 pointer-events-none">
               <Database size={160} />
            </div>
@@ -253,73 +298,77 @@ const StockMovementReport: React.FC = () => {
                  </div>
 
                  <div className="flex-1 overflow-auto custom-scrollbar">
-                    <table className="w-full text-left border-collapse min-w-[1200px]">
-                       <thead className="sticky top-0 z-10 bg-slate-900 text-white text-[10px] font-black uppercase tracking-[0.2em]">
-                          <tr>
-                             <th className="px-6 py-5 border-r border-white/5 text-center w-16">Yıl</th>
-                             <th className="px-6 py-5 border-r border-white/5">Tarih</th>
-                             <th className="px-6 py-5 border-r border-white/5">Fiş / İrsaliye</th>
-                             <th className="px-6 py-5 border-r border-white/5 text-center">İşlem</th>
-                             <th className="px-6 py-5 border-r border-white/5 text-right">Birim Fiyat</th>
-                             <th className="px-6 py-5 border-r border-white/5 text-right">Giriş (+)</th>
-                             <th className="px-6 py-5 border-r border-white/5 text-right">Çıkış (-)</th>
-                             <th className="px-6 py-5 border-r border-white/5 text-right bg-slate-950">Net Bakiye</th>
-                             <th className="px-6 py-5">Açıklama / Kaynak</th>
-                          </tr>
-                       </thead>
-                       <tbody className="divide-y divide-slate-100">
-                          {mockMovements.map(m => (
-                             <tr key={m.id} className="hover:bg-indigo-50/20 transition-all group">
-                                <td className="px-6 py-5 text-center font-bold text-slate-400">{m.year}</td>
-                                <td className="px-6 py-5">
-                                   <div className="flex items-center gap-2 text-xs font-black text-slate-700">
-                                      <Calendar size={14} className="text-slate-300" /> {m.date}
-                                   </div>
-                                </td>
-                                <td className="px-6 py-5">
-                                   <span className="px-3 py-1 bg-slate-100 text-slate-600 rounded-lg text-xs font-black font-mono border border-slate-200">{m.slipNo}</span>
-                                </td>
-                                <td className="px-6 py-5 text-center">
-                                   <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase border ${m.inQty > 0 ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-rose-50 text-rose-600 border-rose-100'}`}>
-                                      {m.type}
-                                   </span>
-                                </td>
-                                <td className="px-6 py-5 text-right font-bold text-slate-600">
-                                   {m.price > 0 ? `₺${m.price.toFixed(2)}` : '---'}
-                                </td>
-                                <td className="px-6 py-5 text-right">
-                                   <span className={`text-sm font-black ${m.inQty > 0 ? 'text-emerald-600' : 'text-slate-200'}`}>
-                                      {m.inQty > 0 ? `+${m.inQty.toLocaleString()}` : '-'}
-                                   </span>
-                                </td>
-                                <td className="px-6 py-5 text-right">
-                                   <span className={`text-sm font-black ${m.outQty > 0 ? 'text-rose-600' : 'text-slate-200'}`}>
-                                      {m.outQty > 0 ? `-${m.outQty.toLocaleString()}` : '-'}
-                                   </span>
-                                </td>
-                                <td className="px-6 py-5 text-right bg-slate-50/50">
-                                   <span className="text-sm font-black text-indigo-600 tracking-tight">{m.balance.toLocaleString()}</span>
-                                </td>
-                                <td className="px-6 py-5">
-                                   <p className="text-xs font-bold text-slate-800 leading-none mb-1 uppercase">{m.customerName}</p>
-                                   <p className="text-[10px] text-slate-400 font-medium italic truncate max-w-[200px]">{m.description}</p>
-                                </td>
-                             </tr>
-                          ))}
-                       </tbody>
-                    </table>
+                    {loading ? (
+                      <div className="h-64 flex items-center justify-center"><Loader2 className="animate-spin text-indigo-600" /></div>
+                    ) : (
+                      <table className="w-full text-left border-collapse min-w-[1200px]">
+                        <thead className="sticky top-0 z-10 bg-slate-900 text-white text-[10px] font-black uppercase tracking-[0.2em]">
+                           <tr>
+                              <th className="px-6 py-5 border-r border-white/5 text-center w-16">Yıl</th>
+                              <th className="px-6 py-5 border-r border-white/5">Tarih</th>
+                              <th className="px-6 py-5 border-r border-white/5">Fiş / İrsaliye</th>
+                              <th className="px-6 py-5 border-r border-white/5 text-center">İşlem</th>
+                              <th className="px-6 py-5 border-r border-white/5 text-right">Birim Fiyat</th>
+                              <th className="px-6 py-5 border-r border-white/5 text-right">Giriş (+)</th>
+                              <th className="px-6 py-5 border-r border-white/5 text-right">Çıkış (-)</th>
+                              <th className="px-6 py-5 border-r border-white/5 text-right bg-slate-950">Net Bakiye</th>
+                              <th className="px-6 py-5">Açıklama / Kaynak</th>
+                           </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                           {movements.map(m => (
+                              <tr key={m.id} className="hover:bg-indigo-50/20 transition-all group">
+                                 <td className="px-6 py-5 text-center font-bold text-slate-400">{m.year}</td>
+                                 <td className="px-6 py-5">
+                                    <div className="flex items-center gap-2 text-xs font-black text-slate-700">
+                                       <Calendar size={14} className="text-slate-300" /> {m.date}
+                                    </div>
+                                 </td>
+                                 <td className="px-6 py-5">
+                                    <span className="px-3 py-1 bg-slate-100 text-slate-600 rounded-lg text-xs font-black font-mono border border-slate-200">{m.slipNo}</span>
+                                 </td>
+                                 <td className="px-6 py-5 text-center">
+                                    <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase border ${m.inQty > 0 ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-rose-50 text-rose-600 border-rose-100'}`}>
+                                       {m.type}
+                                    </span>
+                                 </td>
+                                 <td className="px-6 py-5 text-right font-bold text-slate-600">
+                                    {m.price > 0 ? `₺${m.price.toFixed(2)}` : '---'}
+                                 </td>
+                                 <td className="px-6 py-5 text-right">
+                                    <span className={`text-sm font-black ${m.inQty > 0 ? 'text-emerald-600' : 'text-slate-200'}`}>
+                                       {m.inQty > 0 ? `+${m.inQty.toLocaleString()}` : '-'}
+                                    </span>
+                                 </td>
+                                 <td className="px-6 py-5 text-right">
+                                    <span className={`text-sm font-black ${m.outQty > 0 ? 'text-rose-600' : 'text-slate-200'}`}>
+                                       {m.outQty > 0 ? `-${m.outQty.toLocaleString()}` : '-'}
+                                    </span>
+                                 </td>
+                                 <td className="px-6 py-5 text-right bg-slate-50/50">
+                                    <span className="text-sm font-black text-indigo-600 tracking-tight">{m.balance.toLocaleString()}</span>
+                                 </td>
+                                 <td className="px-6 py-5">
+                                    <p className="text-xs font-bold text-slate-800 leading-none mb-1 uppercase">{m.customerName}</p>
+                                    <p className="text-[10px] text-slate-400 font-medium italic truncate max-w-[200px]">{m.description}</p>
+                                 </td>
+                              </tr>
+                           ))}
+                        </tbody>
+                      </table>
+                    )}
                  </div>
 
                  <div className="bg-slate-900 p-8 flex items-center justify-between text-white border-t border-white/5 shrink-0">
                     <div className="flex items-center gap-12">
                        <div>
                           <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Toplam Giriş Hacmi</p>
-                          <p className="text-xl font-black tracking-tight text-emerald-400">+{mockMovements.reduce((a,b)=>a+b.inQty, 0).toLocaleString()}</p>
+                          <p className="text-xl font-black tracking-tight text-emerald-400">+{movements.reduce((a,b)=>a+b.inQty, 0).toLocaleString()}</p>
                        </div>
                        <div className="w-[1px] h-10 bg-white/10" />
                        <div>
                           <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Toplam Çıkış Hacmi</p>
-                          <p className="text-xl font-black tracking-tight text-rose-400">-{mockMovements.reduce((a,b)=>a+b.outQty, 0).toLocaleString()}</p>
+                          <p className="text-xl font-black tracking-tight text-rose-400">-{movements.reduce((a,b)=>a+b.outQty, 0).toLocaleString()}</p>
                        </div>
                     </div>
                  </div>
@@ -339,8 +388,10 @@ const StockMovementReport: React.FC = () => {
                        </div>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                       {mockBalances.map(wb => (
-                          <div key={wb.id} className={`p-6 rounded-[2.5rem] border-2 transition-all group hover:shadow-xl ${wb.balance > 0 ? 'bg-indigo-50/30 border-indigo-100 hover:border-indigo-300' : 'bg-slate-50 border-slate-100'}`}>
+                       {loading ? (
+                         <div className="col-span-full flex justify-center py-10"><Loader2 className="animate-spin text-indigo-600" /></div>
+                       ) : balances.map((wb, index) => (
+                          <div key={wb.id || index} className={`p-6 rounded-[2.5rem] border-2 transition-all group hover:shadow-xl ${wb.balance > 0 ? 'bg-indigo-50/30 border-indigo-100 hover:border-indigo-300' : 'bg-slate-50 border-slate-100'}`}>
                              <div className="flex items-center justify-between mb-4">
                                 <div className="flex items-center gap-3">
                                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${wb.balance > 0 ? 'bg-indigo-600 text-white' : 'bg-slate-200 text-slate-400'}`}>
@@ -351,10 +402,11 @@ const StockMovementReport: React.FC = () => {
                              </div>
                              <div className="text-right">
                                 <span className={`text-2xl font-black tracking-tight ${wb.balance > 0 ? 'text-indigo-600' : 'text-slate-300'}`}>{wb.balance.toLocaleString()}</span>
-                                <span className="text-[10px] font-black text-slate-400 ml-2">{selectedStock.unit}</span>
+                                <span className="text-[10px] font-black text-slate-400 ml-2">{selectedStock?.unit || ''}</span>
                              </div>
                           </div>
                        ))}
+                       {!loading && balances.length === 0 && <div className="col-span-full text-center py-10 text-slate-300 font-bold uppercase tracking-widest">Bakiye Verisi Yok</div>}
                     </div>
                  </div>
               </div>
