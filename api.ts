@@ -314,6 +314,8 @@ export const apiService = {
 
   customers: {
     getAll: () => request(`${API_BASE_URL}/customers`, undefined, [], mapCustomerData),
+    generateNextCode: (prefix: string) => 
+      request(`${API_BASE_URL}/customers/next-code/${prefix}`, undefined, { nextCode: `${prefix}0001` }),
     save: (data: any) => request(`${API_BASE_URL}/customers`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

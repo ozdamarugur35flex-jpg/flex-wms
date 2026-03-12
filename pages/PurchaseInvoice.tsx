@@ -28,6 +28,7 @@ import {
 } from 'lucide-react';
 import { InvoiceItem, StockCard, CustomerCard } from '../types';
 import { apiService } from '../api';
+import SearchableSelect from '../components/SearchableSelect';
 
 const PurchaseInvoice: React.FC = () => {
   const today = new Date().toISOString().split('T')[0];
@@ -294,19 +295,18 @@ const PurchaseInvoice: React.FC = () => {
                       />
                    </div>
 
-                   <div className="md:col-span-2 space-y-2">
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-2">
-                         <User size={14} className="text-emerald-500" /> Tedarikçi Seçimi
-                      </label>
-                      <select 
-                        className="w-full px-5 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none focus:border-emerald-500"
+                   <div className="md:col-span-2">
+                      <SearchableSelect 
+                        label="Tedarikçi Seçimi"
+                        placeholder="Tedarikçi Seçiniz..."
                         value={invoiceHeader.customerCode}
                         disabled={!canEdit}
-                        onChange={(e) => handleCustomerChange(e.target.value)}
-                      >
-                         <option value="">Seçiniz...</option>
-                         {customers.map(c => <option key={c.code} value={c.code}>{c.code} | {c.name}</option>)}
-                      </select>
+                        onChange={handleCustomerChange}
+                        options={customers.map(c => ({
+                          value: c.code,
+                          label: c.name
+                        }))}
+                      />
                    </div>
                 </div>
                 
@@ -380,19 +380,18 @@ const PurchaseInvoice: React.FC = () => {
               </div>
               
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-end relative z-10">
-                 <div className="lg:col-span-4 space-y-2">
-                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1 flex items-center gap-2">
-                       <Box size={14} className="text-emerald-400" /> Stok Kartı Seçimi
-                    </label>
-                    <select 
-                      disabled={!canEdit}
-                      className="w-full px-5 py-4 bg-white/10 border border-white/20 rounded-[1.5rem] text-sm font-black outline-none focus:ring-4 focus:ring-emerald-500/20 focus:border-emerald-500 backdrop-blur-md transition-all appearance-none pr-12"
+                 <div className="lg:col-span-4">
+                    <SearchableSelect 
+                      label="Stok Kartı Seçimi"
+                      placeholder="Stok Seçiniz..."
                       value={lineEntry.stockCode}
-                      onChange={(e) => handleStockChange(e.target.value)}
-                    >
-                       <option value="" className="text-slate-900">Seçiniz...</option>
-                       {stocks.map(s => <option key={s.code} value={s.code} className="text-slate-900">{s.code} | {s.name}</option>)}
-                    </select>
+                      disabled={!canEdit}
+                      onChange={handleStockChange}
+                      options={stocks.map(s => ({
+                        value: s.code,
+                        label: s.name
+                      }))}
+                    />
                  </div>
 
                  <div className="lg:col-span-2 space-y-2">

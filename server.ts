@@ -10,6 +10,11 @@ async function startServer() {
   app.use(express.json());
 
   // --- MOCK DATABASE (Netsis Simülasyonu) ---
+  let customers = [
+    { id: 'C001', code: 'C001', name: 'Aksoy Metal Ltd.', type: 'Satıcı', locationType: 'Yurt İçi', taxOffice: 'Maslak V.D.', taxNumber: '1234567890', phone: '0212 555 11 22', email: 'info@aksoymetal.com' },
+    { id: 'C002', code: 'C002', name: 'Global Trading Co.', type: 'Satıcı', locationType: 'Yurt Dışı', taxOffice: 'London Tax', taxNumber: 'GB99887766', phone: '+44 20 7766 5544', email: 'sales@globaltrading.com' }
+  ];
+
   let stocks = [
     { 
       id: 'AL-2020', 
@@ -183,10 +188,43 @@ async function startServer() {
 
   // [GET] /api/customers
   app.get("/api/customers", (req, res) => {
-    res.json([
-      { id: 'C001', code: 'C001', name: 'Aksoy Metal Ltd.', type: 'Satıcı', locationType: 'Yurt İçi' },
-      { id: 'C002', code: 'C002', name: 'Global Trading Co.', type: 'Satıcı', locationType: 'Yurt Dışı' }
-    ]);
+    res.json(customers);
+  });
+
+  // [GET] /api/customers/next-code/:prefix
+  app.get("/api/customers/next-code/:prefix", (req, res) => {
+    const { prefix } = req.params;
+    const lastCustomer = customers
+      .filter(c => c.code.startsWith(prefix))
+      .sort((a, b) => b.code.localeCompare(a.code))[0];
+    
+    let nextNum = 1;
+    if (lastCustomer) {
+      const numPart = lastCustomer.code.replace(prefix, "");
+      if (!isNaN(parseInt(numPart))) {
+        nextNum = parseInt(numPart) + 1;
+      }
+    }
+    const nextCode = `${prefix}${nextNum.toString().padStart(4, '0')}`;
+    res.json({ nextCode });
+  });
+
+  // [POST] /api/customers
+  app.post("/api/customers", (req, res) => {
+    const data = req.body;
+    const index = customers.findIndex(c => c.code === data.code);
+    if (index > -1) {
+      customers[index] = { ...customers[index], ...data };
+    } else {
+      customers.push({ ...data, id: data.code });
+    }
+    res.json({ success: true, message: "Cari kart Netsis'e (Sim) kaydedildi." });
+  });
+
+  // [DELETE] /api/customers/:code
+  app.delete("/api/customers/:code", (req, res) => {
+    customers = customers.filter(c => c.code !== req.params.code);
+    res.json({ success: true });
   });
 
   // [GET] /api/warehouses
@@ -197,11 +235,27 @@ async function startServer() {
     ]);
   });
 
-  // [GET] /api/warehouses/locations
-  app.get("/api/warehouses/locations", (req, res) => {
+  // [GET] /api/locations
+  app.get("/api/locations", (req, res) => {
     res.json([
       { id: 'L1', warehouseCode: '01', cellCode: 'A-01-01', status: 'Boş', fillRate: 0 },
       { id: 'L2', warehouseCode: '01', cellCode: 'A-01-02', status: 'Dolu', fillRate: 100 }
+    ]);
+  });
+
+  // [GET] /api/capacities
+  app.get("/api/capacities", (req, res) => {
+    res.json([
+      { id: 'C1', warehouseCode: '01', cellCode: 'A-01-01', capacityQty: 1000, capacityWeight: 500, capacityVolume: 200, cellType: 'RACK' },
+      { id: 'C2', warehouseCode: '01', cellCode: 'A-01-02', capacityQty: 500, capacityWeight: 250, capacityVolume: 100, cellType: 'SHELF' }
+    ]);
+  });
+
+  // [GET] /api/stocks/warehouse-limits
+  app.get("/api/stocks/warehouse-limits", (req, res) => {
+    res.json([
+      { id: '1', stockCode: 'AL-2020', stockName: 'Alüminyum Profil 20x20', warehouseCode: 1, minLevel: 100, maxLevel: 5000, reorderPoint: 500 },
+      { id: '2', stockCode: 'SMN-M8', stockName: 'Çelik Somun M8', warehouseCode: 1, minLevel: 1000, maxLevel: 50000, reorderPoint: 5000 }
     ]);
   });
 
@@ -341,6 +395,47 @@ async function startServer() {
       { stockCode: 'AL-2020', stockName: 'Alüminyum Profil 20x20', totalQty: 5000, lastPrice: 120.50, lastDate: '2024-03-05' },
       { stockCode: 'SMN-M8', stockName: 'Çelik Somun M8', totalQty: 15000, lastPrice: 2.45, lastDate: '2024-02-28' }
     ]);
+  });
+
+  // [GET] /api/customerorders/status-report
+  app.get("/api/customerorders/status-report", (req, res) => {
+    res.json([
+      { siparisNo: 'SIP001', siparisTarihi: '2024-03-01', musteriAdi: 'Aksoy Metal', stokKodu: 'AL-2020', stokAdi: 'Alüminyum Profil', siparisMiktari: 1000, sevkEdilenMiktar: 400, bakiyeMiktar: 600, birimFiyat: 120, kapaliMi: false },
+      { siparisNo: 'SIP002', siparisTarihi: '2024-03-05', musteriAdi: 'Global Trading', stokKodu: 'SMN-M8', stokAdi: 'Çelik Somun', siparisMiktari: 5000, sevkEdilenMiktar: 5000, bakiyeMiktar: 0, birimFiyat: 2.5, kapaliMi: true }
+    ]);
+  });
+
+  // --- PURCHASE INVOICE API ---
+  let purchaseInvoices: any[] = [
+    {
+      id: 'AL-2024001',
+      invoiceNo: 'AL-2024001',
+      customerCode: 'C001',
+      customerName: 'Aksoy Metal Ltd.',
+      date: '2024-03-10',
+      totalAmount: 12500,
+      gibInvoiceNo: 'GIB20240001',
+      description: 'Hammadde Alımı',
+      items: [
+        { id: '1', invoiceNo: 'AL-2024001', stockCode: 'AL-2020', stockName: 'Alüminyum Profil 20x20', quantity: 100, unit: 'ADET', price: 125, date: '2024-03-10', warehouseCode: 1 }
+      ]
+    }
+  ];
+
+  app.get("/api/purchaseinvoices", (req, res) => res.json(purchaseInvoices));
+  app.get("/api/purchaseinvoices/:invoiceNo", (req, res) => {
+    const inv = purchaseInvoices.find(i => i.invoiceNo === req.params.invoiceNo);
+    if (inv) res.json(inv);
+    else res.status(404).json({ message: "Alış irsaliyesi bulunamadı" });
+  });
+  app.post("/api/purchaseinvoices", (req, res) => {
+    const data = req.body;
+    purchaseInvoices.push({ ...data, id: data.invoiceNo || Math.random().toString(36).substr(2, 9) });
+    res.json({ success: true, message: "Alış irsaliyesi Netsis'e (Sim) kaydedildi." });
+  });
+  app.delete("/api/purchaseinvoices/:invoiceNo", (req, res) => {
+    purchaseInvoices = purchaseInvoices.filter(i => i.invoiceNo !== req.params.invoiceNo);
+    res.json({ success: true });
   });
 
   // --- SALES INVOICE API ---

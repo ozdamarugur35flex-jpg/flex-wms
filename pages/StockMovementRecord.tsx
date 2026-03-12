@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   History, 
   Plus, 
@@ -25,7 +25,9 @@ import {
   LayoutList,
   MoreHorizontal
 } from 'lucide-react';
-import { StockMovementLine } from '../types';
+import { StockMovementLine, StockCard } from '../types';
+import { apiService } from '../api';
+import SearchableSelect from '../components/SearchableSelect';
 
 const mockMovements: StockMovementLine[] = [
   { id: '1', date: '2024-03-21', slipNo: 'FIS-000123', waybillNo: 'IRS-998', type: 'Giriş', inQty: 100, outQty: 0, balance: 450, description: 'Satınalma Stok Girişi', warehouseCode: '01', cellCode: 'A-01-05', serialNo: 'SR-2024-X' },
@@ -37,7 +39,28 @@ const StockMovementRecord: React.FC = () => {
   const [movements, setMovements] = useState<StockMovementLine[]>(mockMovements);
   const [movementType, setMovementType] = useState<'Giriş' | 'Çıkış'>('Giriş');
   const [isHeaderOpen, setHeaderOpen] = useState(false);
-  const [selectedStock, setSelectedStock] = useState({ code: 'AL-2020', name: 'Alüminyum Profil 20x20', unit: 'ADET', currentStock: 450 });
+  const [stocks, setStocks] = useState<StockCard[]>([]);
+  const [selectedStockCode, setSelectedStockCode] = useState('AL-2020');
+  const [isLoading, setIsLoading] = useState(false);
+
+  const selectedStock = useMemo(() => {
+    return stocks.find(s => s.code === selectedStockCode) || { code: 'AL-2020', name: 'Alüminyum Profil 20x20', unit: 'ADET', currentStock: 450 };
+  }, [stocks, selectedStockCode]);
+
+  useEffect(() => {
+    const fetchStocks = async () => {
+      setIsLoading(true);
+      try {
+        const data = await apiService.stocks.getAll();
+        setStocks(data);
+      } catch (error) {
+        console.error('Stock fetch error:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchStocks();
+  }, []);
 
   const totalIn = useMemo(() => movements.reduce((a, b) => a + b.inQty, 0), [movements]);
   const totalOut = useMemo(() => movements.reduce((a, b) => a + b.outQty, 0), [movements]);
@@ -183,19 +206,18 @@ const StockMovementRecord: React.FC = () => {
                </div>
 
                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="md:col-span-2 space-y-2">
-                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-2">
-                        <Box size={14} className="text-sky-500" /> Stok Seçimi (grdLueStokKod)
-                     </label>
-                     <div className="relative group">
-                        <select className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-[1.5rem] text-sm font-black text-slate-800 outline-none focus:ring-4 focus:ring-sky-500/10 focus:border-sky-500 transition-all appearance-none">
-                           <option>AL-2020 | Alüminyum Profil 20x20</option>
-                           <option>SMN-M8 | Çelik Somun M8</option>
-                        </select>
-                        <Search className="absolute right-6 top-1/2 -translate-y-1/2 text-slate-300 group-hover:text-sky-500 transition-colors" size={20} />
-                     </div>
+                  <div className="md:col-span-2">
+                     <SearchableSelect 
+                        label="Stok Seçimi (grdLueStokKod)"
+                        placeholder="Stok Seçiniz..."
+                        value={selectedStockCode}
+                        onChange={setSelectedStockCode}
+                        options={stocks.map(s => ({
+                          value: s.code,
+                          label: s.name
+                        }))}
+                     />
                   </div>
-
                   <div className="space-y-2">
                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-2">
                         <WarehouseIcon size={14} className="text-sky-500" /> Depo Kod (grdLueDepo)

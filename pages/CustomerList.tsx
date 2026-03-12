@@ -23,6 +23,7 @@ const CustomerList: React.FC = () => {
     phone: '',
     email: ''
   });
+  const [isEditing, setIsEditing] = useState(false);
 
   const loadCustomers = async () => {
     setLoading(true);
@@ -34,6 +35,28 @@ const CustomerList: React.FC = () => {
   useEffect(() => {
     loadCustomers();
   }, []);
+
+  const handleEdit = (customer: CustomerCard) => {
+    setFormData({ ...customer });
+    setIsEditing(true);
+    setIsModalOpen(true);
+  };
+
+  const handleCodeChange = async (val: string) => {
+    setFormData({ ...formData, code: val });
+    
+    // Otomatik kod üretme: 3 karakter girildiğinde ve yeni kayıt ise
+    if (val.length === 3 && !isEditing) {
+      try {
+        const result = await apiService.customers.generateNextCode(val);
+        if (result && result.nextCode) {
+          setFormData(prev => ({ ...prev, code: result.nextCode }));
+        }
+      } catch (error) {
+        console.error('Kod üretme hatası:', error);
+      }
+    }
+  };
 
   const handleSave = async () => {
     if (!formData.code || !formData.name) {
@@ -89,6 +112,7 @@ const CustomerList: React.FC = () => {
         <div className="flex items-center gap-2">
           <button onClick={() => {
             setFormData({ type: 'Alıcı', locationType: 'Yurt İçi', code: '', name: '', phone: '', email: '', taxNumber: '', taxOffice: '' });
+            setIsEditing(false);
             setIsModalOpen(true);
           }} className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold hover:bg-indigo-700 transition-all active:scale-95 shadow-md">
             <UserPlus size={16} /> Yeni Cari
@@ -109,7 +133,7 @@ const CustomerList: React.FC = () => {
                   <UserPlus size={24} />
                 </div>
                 <div>
-                  <h2 className="text-xl font-black tracking-tight">Yeni Cari Kart</h2>
+                  <h2 className="text-xl font-black tracking-tight">{isEditing ? 'Cari Kart Düzenle' : 'Yeni Cari Kart'}</h2>
                   <p className="text-[10px] font-bold uppercase tracking-[0.2em] opacity-70">Netsis Cari Kayıt Formu</p>
                 </div>
               </div>
@@ -123,10 +147,11 @@ const CustomerList: React.FC = () => {
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Cari Kodu</label>
                 <input 
                   type="text" 
-                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-black outline-none focus:border-indigo-500 transition-all"
+                  className={`w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-black outline-none focus:border-indigo-500 transition-all ${isEditing ? 'opacity-50 cursor-not-allowed' : ''}`}
                   value={formData.code}
-                  onChange={(e) => setFormData({...formData, code: e.target.value})}
+                  onChange={(e) => handleCodeChange(e.target.value)}
                   placeholder="Örn: 120-01-001"
+                  disabled={isEditing}
                 />
               </div>
               <div className="space-y-2">
@@ -160,6 +185,15 @@ const CustomerList: React.FC = () => {
                   <option value="Yurt İçi">Yurt İçi</option>
                   <option value="Yurt Dışı">Yurt Dışı</option>
                 </select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Vergi Dairesi</label>
+                <input 
+                  type="text" 
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-black outline-none focus:border-indigo-500 transition-all"
+                  value={formData.taxOffice}
+                  onChange={(e) => setFormData({...formData, taxOffice: e.target.value})}
+                />
               </div>
               <div className="space-y-2">
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Vergi Numarası</label>
@@ -248,14 +282,24 @@ const CustomerList: React.FC = () => {
                     <td className="px-6 py-4 text-right">
                       <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-all">
                         <button 
-                          onClick={() => handleDelete(customer.code)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleEdit(customer);
+                          }}
+                          className="p-2 text-slate-400 hover:text-indigo-600 transition-all"
+                          title="Düzenle"
+                        >
+                          <FileText size={18} />
+                        </button>
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDelete(customer.code);
+                          }}
                           className="p-2 text-slate-400 hover:text-rose-600 transition-all"
                           title="Sil"
                         >
                           <Trash2 size={18} />
-                        </button>
-                        <button className="p-2 text-slate-400 hover:text-indigo-600 transition-all">
-                          <MoreHorizontal size={18} />
                         </button>
                       </div>
                     </td>
