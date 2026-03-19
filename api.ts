@@ -406,6 +406,7 @@ export const apiService = {
   salesInvoices: {
     getAll: () => request(`${API_BASE_URL}/salesinvoices`, undefined, [], mapSalesInvoiceData),
     getDetail: (invoiceNo: string) => request(`${API_BASE_URL}/salesinvoices/${invoiceNo}`, undefined, null, mapSalesInvoiceData),
+    getEWaybillDetails: (invoiceNo: string) => request(`${API_BASE_URL}/salesinvoices/${invoiceNo}/ewaybill`, undefined, null),
     save: (data: any) => request(`${API_BASE_URL}/salesinvoices`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

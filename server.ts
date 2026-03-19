@@ -466,6 +466,23 @@ async function startServer() {
     if (inv) res.json(inv);
     else res.status(404).json({ message: "İrsaliye bulunamadı" });
   });
+
+  app.get("/api/salesinvoices/:invoiceNo/ewaybill", (req, res) => {
+    // Mock e-waybill data based on the VB.NET code provided by the user
+    res.json({
+      gibInvoiceNo: 'GIB' + new Date().getFullYear() + '000000123',
+      carrierName: 'MNG Kargo',
+      licensePlateId: '34 ABC 123',
+      driverFirstName: 'Ahmet',
+      driverLastName: 'Yılmaz',
+      carrierSubCity: 'Şişli',
+      carrierCity: 'İstanbul',
+      carrierVkn: '1234567890',
+      driverNid: '12345678901',
+      carrierPostal: '34360'
+    });
+  });
+
   app.post("/api/salesinvoices", (req, res) => {
     const data = req.body;
     salesInvoices.push({ ...data, id: data.invoiceNo });

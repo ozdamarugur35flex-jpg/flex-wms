@@ -37,11 +37,36 @@ const SalesInvoicePage: React.FC = () => {
   const today = new Date().toISOString().split('T')[0];
   const [activeTab, setActiveTab] = useState<'header' | 'lines'>('header');
   const [isPreviewMode, setIsPreviewMode] = useState(false);
+  const [eWaybillDetails, setEWaybillDetails] = useState<any>(null);
   const [items, setItems] = useState<InvoiceItem[]>([]);
   const [stocks, setStocks] = useState<StockCard[]>([]);
   const [customers, setCustomers] = useState<CustomerCard[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  
+  // Search States
+  const [customerSearch, setCustomerSearch] = useState('');
+  const [isCustomerDropdownOpen, setIsCustomerDropdownOpen] = useState(false);
+  const [stockSearch, setStockSearch] = useState('');
+  const [isStockDropdownOpen, setIsStockDropdownOpen] = useState(false);
+
+  const filteredCustomers = useMemo(() => {
+    if (!customerSearch) return customers;
+    const lowerSearch = customerSearch.toLowerCase();
+    return customers.filter(c => 
+      c.code.toLowerCase().includes(lowerSearch) || 
+      c.name.toLowerCase().includes(lowerSearch)
+    );
+  }, [customers, customerSearch]);
+
+  const filteredStocks = useMemo(() => {
+    if (!stockSearch) return stocks;
+    const lowerSearch = stockSearch.toLowerCase();
+    return stocks.filter(s => 
+      s.code.toLowerCase().includes(lowerSearch) || 
+      s.name.toLowerCase().includes(lowerSearch)
+    );
+  }, [stocks, stockSearch]);
   
   // Header State
   const [invoiceHeader, setInvoiceHeader] = useState<Partial<SalesInvoice>>({
@@ -172,6 +197,19 @@ const SalesInvoicePage: React.FC = () => {
     }
   };
 
+  const handlePreview = async () => {
+    if (invoiceHeader.invoiceNo) {
+      try {
+        const details = await apiService.salesInvoices.getEWaybillDetails(invoiceHeader.invoiceNo);
+        setEWaybillDetails(details);
+      } catch (error) {
+        console.error("E-İrsaliye detayları alınamadı", error);
+        setEWaybillDetails(null);
+      }
+    }
+    setIsPreviewMode(true);
+  };
+
   const handleDateChange = (val: string) => {
     setInvoiceHeader(prev => ({
       ...prev,
@@ -253,9 +291,29 @@ const SalesInvoicePage: React.FC = () => {
               </table>
            </div>
            <div className="mt-12 border-t pt-4">
-              <div className="text-xs leading-relaxed italic">
+              <div className="text-xs leading-relaxed italic mb-4">
                  <p><span className="font-bold">Açıklama:</span> {invoiceHeader.description}</p>
               </div>
+              
+              {eWaybillDetails && (
+                <div className="mt-8 border-t border-slate-200 pt-4 text-xs">
+                  <h3 className="font-bold text-sm mb-2 uppercase">E-İrsaliye / Taşıyıcı Bilgileri</h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p><span className="font-bold">GİB İrsaliye No:</span> {eWaybillDetails.gibInvoiceNo}</p>
+                      <p><span className="font-bold">Taşıyıcı Firma:</span> {eWaybillDetails.carrierName}</p>
+                      <p><span className="font-bold">Taşıyıcı VKN:</span> {eWaybillDetails.carrierVkn}</p>
+                      <p><span className="font-bold">İl / İlçe:</span> {eWaybillDetails.carrierCity} / {eWaybillDetails.carrierSubCity}</p>
+                      <p><span className="font-bold">Posta Kodu:</span> {eWaybillDetails.carrierPostal}</p>
+                    </div>
+                    <div>
+                      <p><span className="font-bold">Araç Plaka:</span> {eWaybillDetails.licensePlateId}</p>
+                      <p><span className="font-bold">Şoför Adı Soyadı:</span> {eWaybillDetails.driverFirstName} {eWaybillDetails.driverLastName}</p>
+                      <p><span className="font-bold">Şoför TCKN:</span> {eWaybillDetails.driverNid}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
            </div>
         </div>
       </div>
@@ -319,7 +377,7 @@ const SalesInvoicePage: React.FC = () => {
             </>
           )}
           <button 
-            onClick={() => setIsPreviewMode(true)}
+            onClick={handlePreview}
             className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-600 rounded-xl text-xs font-bold hover:bg-slate-50 active:scale-95 transition-all"
           >
             <Eye size={16} className="text-sky-600" /> Önizleme
@@ -413,19 +471,52 @@ const SalesInvoicePage: React.FC = () => {
                       />
                    </div>
 
-                   <div className="md:col-span-2 space-y-2">
+                   <div className="md:col-span-2 space-y-2 relative">
                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-2">
                          <User size={14} className="text-indigo-500" /> Müşteri Seçimi
                       </label>
-                      <select 
-                        disabled={!canEdit}
-                        className="w-full px-5 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none focus:border-indigo-500"
-                        value={invoiceHeader.customerCode}
-                        onChange={(e) => handleCustomerChange(e.target.value)}
-                      >
-                         <option value="">Müşteri Seçiniz...</option>
-                         {customers.map(c => <option key={c.code} value={c.code}>{c.code} | {c.name}</option>)}
-                      </select>
+                      <div className="relative">
+                        <input
+                          type="text"
+                          disabled={!canEdit}
+                          className="w-full px-5 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none focus:border-indigo-500"
+                          placeholder="Müşteri Ara (Kod veya İsim)..."
+                          value={isCustomerDropdownOpen ? customerSearch : (invoiceHeader.customerName ? `${invoiceHeader.customerCode} | ${invoiceHeader.customerName}` : '')}
+                          onChange={(e) => {
+                            setCustomerSearch(e.target.value);
+                            setIsCustomerDropdownOpen(true);
+                          }}
+                          onFocus={() => {
+                            setCustomerSearch('');
+                            setIsCustomerDropdownOpen(true);
+                          }}
+                          onBlur={() => {
+                            setTimeout(() => setIsCustomerDropdownOpen(false), 200);
+                          }}
+                        />
+                        {isCustomerDropdownOpen && (
+                          <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-60 overflow-y-auto">
+                            {filteredCustomers.length > 0 ? (
+                              filteredCustomers.map(c => (
+                                <div
+                                  key={c.code}
+                                  className="px-4 py-2 hover:bg-indigo-50 cursor-pointer text-sm text-slate-700 border-b border-slate-50 last:border-0"
+                                  onMouseDown={(e) => {
+                                    e.preventDefault();
+                                    handleCustomerChange(c.code);
+                                    setIsCustomerDropdownOpen(false);
+                                  }}
+                                >
+                                  <div className="font-bold">{c.code}</div>
+                                  <div className="text-xs text-slate-500">{c.name}</div>
+                                </div>
+                              ))
+                            ) : (
+                              <div className="px-4 py-3 text-sm text-slate-500 text-center">Müşteri bulunamadı</div>
+                            )}
+                          </div>
+                        )}
+                      </div>
                    </div>
 
                    <div className="md:col-span-2 space-y-2">
@@ -505,19 +596,52 @@ const SalesInvoicePage: React.FC = () => {
               </div>
               
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-end relative z-10">
-                 <div className="lg:col-span-5 space-y-2">
+                 <div className="lg:col-span-5 space-y-2 relative">
                     <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1 flex items-center gap-2">
                        <Box size={14} className="text-indigo-400" /> Stok Kartı Seçimi
                     </label>
-                    <select 
-                      disabled={!canEdit}
-                      className="w-full px-5 py-4 bg-white/10 border border-white/20 rounded-[1.5rem] text-sm font-black outline-none focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-500 backdrop-blur-md transition-all appearance-none pr-12"
-                      value={lineEntry.stockCode}
-                      onChange={(e) => handleStockChange(e.target.value)}
-                    >
-                       <option value="" className="text-slate-900">Seçiniz...</option>
-                       {stocks.map(s => <option key={s.code} value={s.code} className="text-slate-900">{s.code} | {s.name}</option>)}
-                    </select>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        disabled={!canEdit}
+                        className="w-full px-5 py-4 bg-white/10 border border-white/20 rounded-[1.5rem] text-sm font-black outline-none focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-500 backdrop-blur-md transition-all pr-12 text-white placeholder:text-slate-400"
+                        placeholder="Stok Ara (Kod veya İsim)..."
+                        value={isStockDropdownOpen ? stockSearch : (lineEntry.stockCode ? `${lineEntry.stockCode} | ${stocks.find(s => s.code === lineEntry.stockCode)?.name || ''}` : '')}
+                        onChange={(e) => {
+                          setStockSearch(e.target.value);
+                          setIsStockDropdownOpen(true);
+                        }}
+                        onFocus={() => {
+                          setStockSearch('');
+                          setIsStockDropdownOpen(true);
+                        }}
+                        onBlur={() => {
+                          setTimeout(() => setIsStockDropdownOpen(false), 200);
+                        }}
+                      />
+                      {isStockDropdownOpen && (
+                        <div className="absolute z-50 w-full mt-1 bg-slate-800 border border-slate-700 rounded-xl shadow-lg max-h-60 overflow-y-auto">
+                          {filteredStocks.length > 0 ? (
+                            filteredStocks.map(s => (
+                              <div
+                                key={s.code}
+                                className="px-4 py-2 hover:bg-slate-700 cursor-pointer text-sm text-white border-b border-slate-700 last:border-0"
+                                onMouseDown={(e) => {
+                                  e.preventDefault();
+                                  handleStockChange(s.code);
+                                  setIsStockDropdownOpen(false);
+                                }}
+                              >
+                                <div className="font-bold">{s.code}</div>
+                                <div className="text-xs text-slate-400">{s.name}</div>
+                              </div>
+                            ))
+                          ) : (
+                            <div className="px-4 py-3 text-sm text-slate-400 text-center">Stok bulunamadı</div>
+                          )}
+                        </div>
+                      )}
+                    </div>
                  </div>
 
                  <div className="lg:col-span-2 space-y-2">
