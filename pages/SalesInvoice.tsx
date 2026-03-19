@@ -75,7 +75,7 @@ const SalesInvoicePage: React.FC = () => {
     deliveryDate: today,
     customerCode: '',
     customerName: '',
-    projectCode: 'PRO-2024-X1',
+    projectCode: '',
     taxOffice: '',
     taxNumber: '',
     address: '',
@@ -91,7 +91,7 @@ const SalesInvoicePage: React.FC = () => {
     vat: 20
   });
 
-  const projectCodes = ['PRO-2024-X1', 'PRO-2024-Y2', 'PRO-MAKINE-01', 'PRO-STOK-DEVIR'];
+  const projectCodes = [''];
 
   useEffect(() => {
     const fetchData = async () => {
@@ -125,7 +125,8 @@ const SalesInvoicePage: React.FC = () => {
         customerName: customer.name,
         taxOffice: customer.taxOffice || '',
         taxNumber: customer.taxNumber || '',
-        address: `${customer.name} - ${customer.phone || ''}`
+        address: `${customer.name} - ${customer.phone || ''}`,
+        projectCode: customer.projectCode || '' // Cari seçildiğinde proje kodunu otomatik doldur
       }));
     }
   };
@@ -355,7 +356,7 @@ const SalesInvoicePage: React.FC = () => {
                     deliveryDate: today,
                     customerCode: '',
                     customerName: '',
-                    projectCode: 'PRO-2024-X1',
+                    projectCode: '',
                     taxOffice: '',
                     taxNumber: '',
                     address: '',
