@@ -91,8 +91,6 @@ const SalesInvoicePage: React.FC = () => {
     vat: 20
   });
 
-  const projectCodes = [''];
-
   useEffect(() => {
     const fetchData = async () => {
       setIsLoading(true);
@@ -522,16 +520,16 @@ const SalesInvoicePage: React.FC = () => {
 
                    <div className="md:col-span-2 space-y-2">
                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-2">
-                         <Briefcase size={14} className="text-indigo-500" /> Proje Kodu Seçimi
+                         <Briefcase size={14} className="text-indigo-500" /> Proje Kodu
                       </label>
-                      <select 
+                      <input 
+                        type="text"
                         disabled={!canEdit}
-                        className="w-full px-5 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none focus:border-indigo-500"
+                        readOnly
+                        placeholder="Cari seçildiğinde otomatik gelir"
+                        className="w-full px-5 py-3 bg-slate-100 border border-slate-200 rounded-2xl text-sm font-bold outline-none text-slate-600"
                         value={invoiceHeader.projectCode}
-                        onChange={(e) => setInvoiceHeader({...invoiceHeader, projectCode: e.target.value})}
-                      >
-                         {projectCodes.map(code => <option key={code} value={code}>{code}</option>)}
-                      </select>
+                      />
                    </div>
                 </div>
                 
