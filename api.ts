@@ -53,6 +53,7 @@ const mapCustomerData = (item: any) => {
     taxOffice: item.taxOffice || item.TaxOffice || '',
     phone: item.phone || item.Phone || '',
     email: item.email || item.Email || '',
+    projectCode: item.projectCode || item.ProjectCode || '',
   };
 };
 
