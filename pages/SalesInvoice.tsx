@@ -156,7 +156,7 @@ const SalesInvoicePage: React.FC = () => {
           taxNumber: detail.taxNumber,
           address: detail.address,
           description: detail.description,
-          specialCode1: detail.specialCode1
+          specialCode1: detail.specialCode1 || getSpecialCodeFromProject(detail.projectCode || '')
         });
         setItems(detail.items || []);
         setIsEditMode(true);

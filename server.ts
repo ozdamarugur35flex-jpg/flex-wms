@@ -500,29 +500,54 @@ async function startServer() {
 
   app.post("/api/salesinvoices", (req, res) => {
     const data = req.body;
+    const docDate = new Date(data.date || new Date());
+    
+    // GIB No Oluşturma (EIR + YIL + Son 9 Hane)
+    const cleanNo = (data.invoiceNo || "").replace(/[^0-9]/g, "");
+    const last9 = cleanNo.slice(-9).padStart(9, '0');
+    const gibNo = `EIR${docDate.getFullYear()}${last9}`;
+
+    // Proje koduna göre STHAR_KOD1 (Özel Kod 1) belirleme
+    let stharKod1 = "";
+    if (data.projectCode) {
+      if (data.projectCode.startsWith("3")) stharKod1 = "F";
+      else if (data.projectCode.startsWith("2")) stharKod1 = "S";
+      else if (data.projectCode.startsWith("1")) stharKod1 = "M";
+    }
     
     // Netsis Beklentilerine Göre Veri Zenginleştirme
     const enrichedData = {
       ...data,
       id: data.invoiceNo,
-      // Teslim tarihi boşsa fatura tarihi ile aynı olmalı
+      gibInvoiceNo: gibNo,
       deliveryDate: data.deliveryDate || data.date,
-      // Kayıt yapan kullanıcı bilgisi
       recordedBy: 'FLEX_WMS',
       createdAt: new Date().toISOString(),
-      // Kalemlerin Netsis (TBLSTHAR) ile tam uyumlu olması için FISNO, TARIH ve CARI_KODU ekleme
-      items: (data.items || []).map((item: any, index: number) => ({
-        ...item,
-        invoiceNo: data.invoiceNo, // TBLSTHAR.FISNO
-        customerCode: data.customerCode, // TBLSTHAR.STHAR_CARIKOD
-        date: data.date,           // TBLSTHAR.STHAR_TARIH
-        deliveryDate: data.deliveryDate || data.date,
-        lineNo: index + 1
-      }))
+      // Kalemlerin Netsis (TBLSTHAR) ile tam uyumlu olması
+      items: (data.items || []).map((item: any, index: number) => {
+        const lineBrut = (item.quantity || 0) * (item.price || 0);
+        return {
+          ...item,
+          invoiceNo: data.invoiceNo,    // TBLSTHAR.FISNO
+          customerCode: data.customerCode, // TBLSTHAR.STHAR_CARIKOD
+          date: data.date,              // TBLSTHAR.STHAR_TARIH
+          sthar_htur: 'J',              // Netsis Standart: İrsaliye Satırı
+          sthar_gckod: 'C',             // Netsis Standart: Çıkış
+          sthar_bgtip: 'I',             // Netsis Standart: İrsaliye
+          update_kodu: 'F',             // Netsis Standart: Fatura/İrsaliye
+          sthar_kod1: stharKod1,        // Özel Kod 1
+          sthar_gctut: lineBrut,        // Satır Brüt Tutar
+          lineNo: index + 1             // TBLSTHAR.SIRA
+        };
+      })
     };
 
     salesInvoices.push(enrichedData);
-    res.json({ success: true, message: "Satış irsaliyesi Netsis'e (Sim) taslak olarak kaydedildi." });
+    res.json({ 
+      success: true, 
+      message: "Satış irsaliyesi Netsis'e (Sim) kaydedildi.",
+      invoiceNo: data.invoiceNo 
+    });
   });
 
   app.delete("/api/salesinvoices/:invoiceNo", (req, res) => {
