@@ -475,7 +475,23 @@ async function startServer() {
   ];
 
   app.get("/api/salesinvoices", (req, res) => res.json(salesInvoices));
-  app.get("/api/salesinvoices/next-no", (req, res) => res.json({ nextNo: 'IRS2026000000001' }));
+  app.get("/api/salesinvoices/next-no", (req, res) => {
+    const prefix = "EIR";
+    const eirInvoices = salesInvoices
+      .filter(i => i.invoiceNo && i.invoiceNo.startsWith(prefix))
+      .sort((a, b) => b.invoiceNo.localeCompare(a.invoiceNo));
+
+    if (eirInvoices.length === 0) {
+      return res.json({ nextNo: prefix + "000000000001" });
+    }
+
+    const lastNo = eirInvoices[0].invoiceNo;
+    const numberPart = lastNo.replace(prefix, "");
+    const nextNum = (parseInt(numberPart) || 0) + 1;
+    const nextNo = prefix + nextNum.toString().padStart(12, '0');
+    
+    res.json({ nextNo });
+  });
   app.get("/api/salesinvoices/:invoiceNo", (req, res) => {
     const inv = salesInvoices.find(i => i.invoiceNo === req.params.invoiceNo);
     if (inv) res.json(inv);

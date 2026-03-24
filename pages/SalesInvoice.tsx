@@ -104,13 +104,18 @@ const SalesInvoicePage: React.FC = () => {
     const fetchData = async () => {
       setIsLoading(true);
       try {
-        const [stockList, customerList] = await Promise.all([
+        const [stockList, customerList, nextNoData] = await Promise.all([
           apiService.stocks.getAll(),
-          apiService.customers.getAll()
+          apiService.customers.getAll(),
+          apiService.salesInvoices.generateNextNo()
         ]);
         setStocks(stockList);
         setCustomers(customerList);
-        // "BOS DURUMDA NUMARA VERMESIN" - Do not auto-fill next number on mount
+        
+        // Auto-fill next invoice number on mount
+        if (nextNoData && nextNoData.nextNo) {
+          setInvoiceHeader(prev => ({ ...prev, invoiceNo: nextNoData.nextNo }));
+        }
       } catch (error) {
         console.error('Data fetch error:', error);
       } finally {
@@ -288,15 +293,7 @@ const SalesInvoicePage: React.FC = () => {
         // Refresh next number for the next entry
         const nextNo = await apiService.salesInvoices.generateNextNo();
         if (nextNo && nextNo.nextNo) {
-          let formattedNo = nextNo.nextNo;
-          if (!formattedNo.startsWith('EIR')) {
-            if (formattedNo.startsWith('2026')) {
-              formattedNo = 'EIR' + formattedNo.substring(4).padStart(12, '0');
-            } else {
-              formattedNo = 'EIR' + formattedNo.padStart(12, '0');
-            }
-          }
-          setInvoiceHeader(prev => ({ ...prev, invoiceNo: formattedNo }));
+          setInvoiceHeader(prev => ({ ...prev, invoiceNo: nextNo.nextNo }));
         }
       }
     } catch (error) {
@@ -495,15 +492,7 @@ const SalesInvoicePage: React.FC = () => {
                   try {
                     const nextNo = await apiService.salesInvoices.generateNextNo();
                     if (nextNo && nextNo.nextNo) {
-                      let formattedNo = nextNo.nextNo;
-                      if (!formattedNo.startsWith('EIR')) {
-                        if (formattedNo.startsWith('2026')) {
-                          formattedNo = 'EIR' + formattedNo.substring(4).padStart(12, '0');
-                        } else {
-                          formattedNo = 'EIR' + formattedNo.padStart(12, '0');
-                        }
-                      }
-                      setInvoiceHeader(prev => ({ ...prev, invoiceNo: formattedNo }));
+                      setInvoiceHeader(prev => ({ ...prev, invoiceNo: nextNo.nextNo }));
                     }
                   } catch (err) {
                     console.error('Next no fetch error:', err);
