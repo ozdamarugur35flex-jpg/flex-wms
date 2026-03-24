@@ -552,7 +552,6 @@ async function startServer() {
           sthar_bgtip: 'I',             // Netsis Standart: İrsaliye
           update_kodu: 'F',             // Netsis Standart: Fatura/İrsaliye
           sthar_kod1: stharKod1,        // Özel Kod 1
-          sthar_gctut: lineBrut,        // Satır Brüt Tutar
           lineNo: index + 1             // TBLSTHAR.SIRA
         };
       })
