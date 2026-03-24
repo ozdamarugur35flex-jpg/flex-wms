@@ -46,6 +46,8 @@ export interface CustomerCard {
   taxOffice?: string;
   phone?: string;
   email?: string;
+  projectCode?: string;
+  specialCode1?: string;
 }
 
 export interface Warehouse { id: string; code: string; name: string; isLocked: boolean; isLocationTracking: boolean; lastActivity?: string; }
@@ -331,6 +333,7 @@ export interface SalesInvoice {
     taxOffice: string;
     taxNumber: string;
     address: string;
+    specialCode1?: string;
     items: InvoiceItem[];
 }
 

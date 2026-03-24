@@ -11,8 +11,9 @@ async function startServer() {
 
   // --- MOCK DATABASE (Netsis Simülasyonu) ---
   let customers = [
-    { id: 'C001', code: 'C001', name: 'Aksoy Metal Ltd.', type: 'Satıcı', locationType: 'Yurt İçi', taxOffice: 'Maslak V.D.', taxNumber: '1234567890', phone: '0212 555 11 22', email: 'info@aksoymetal.com' },
-    { id: 'C002', code: 'C002', name: 'Global Trading Co.', type: 'Satıcı', locationType: 'Yurt Dışı', taxOffice: 'London Tax', taxNumber: 'GB99887766', phone: '+44 20 7766 5544', email: 'sales@globaltrading.com' }
+    { id: 'C001', code: 'C001', name: 'Aksoy Metal Ltd.', type: 'Satıcı', locationType: 'Yurt İçi', taxOffice: 'Maslak V.D.', taxNumber: '1234567890', phone: '0212 555 11 22', email: 'info@aksoymetal.com', specialCode1: 'S' },
+    { id: 'C002', code: 'C002', name: 'Global Trading Co.', type: 'Satıcı', locationType: 'Yurt Dışı', taxOffice: 'London Tax', taxNumber: 'GB99887766', phone: '+44 20 7766 5544', email: 'sales@globaltrading.com', specialCode1: 'S' },
+    { id: '12001010006', code: '12001010006', name: 'Örnek Müşteri A.Ş.', type: 'Alıcı', locationType: 'Yurt İçi', taxOffice: 'Kadıköy V.D.', taxNumber: '9998887766', phone: '0216 111 22 33', email: 'info@ornek.com', specialCode1: 'F' }
   ];
 
   let stocks = [
@@ -41,7 +42,21 @@ async function startServer() {
       kod3: '',
       kod4: '',
       kod5: '',
-      lastPurchasePrice: 120.50
+      lastPurchasePrice: 120.50,
+      salesPrices: [1390]
+    },
+    {
+      id: 'STK-1820',
+      code: 'STK-1820',
+      name: 'Örnek Stok 1820',
+      groupCode: 'MAMUL',
+      unit1: 'ADET',
+      purchaseVat: 20,
+      salesVat: 20,
+      quantity: 500,
+      minStockLevel: 100,
+      isLocked: false,
+      salesPrices: [1390]
     }
   ];
 
@@ -485,7 +500,28 @@ async function startServer() {
 
   app.post("/api/salesinvoices", (req, res) => {
     const data = req.body;
-    salesInvoices.push({ ...data, id: data.invoiceNo });
+    
+    // Netsis Beklentilerine Göre Veri Zenginleştirme
+    const enrichedData = {
+      ...data,
+      id: data.invoiceNo,
+      // Teslim tarihi boşsa fatura tarihi ile aynı olmalı
+      deliveryDate: data.deliveryDate || data.date,
+      // Kayıt yapan kullanıcı bilgisi
+      recordedBy: 'FLEX_WMS',
+      createdAt: new Date().toISOString(),
+      // Kalemlerin Netsis (TBLSTHAR) ile tam uyumlu olması için FISNO, TARIH ve CARI_KODU ekleme
+      items: (data.items || []).map((item: any, index: number) => ({
+        ...item,
+        invoiceNo: data.invoiceNo, // TBLSTHAR.FISNO
+        customerCode: data.customerCode, // TBLSTHAR.STHAR_CARIKOD
+        date: data.date,           // TBLSTHAR.STHAR_TARIH
+        deliveryDate: data.deliveryDate || data.date,
+        lineNo: index + 1
+      }))
+    };
+
+    salesInvoices.push(enrichedData);
     res.json({ success: true, message: "Satış irsaliyesi Netsis'e (Sim) taslak olarak kaydedildi." });
   });
 

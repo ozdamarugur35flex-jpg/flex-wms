@@ -28,6 +28,8 @@ import {
   AlertTriangle,
   Hash,
   Briefcase,
+  Tag,
+  Clock,
   Loader2
 } from 'lucide-react';
 import { SalesInvoice, InvoiceItem, StockCard, CustomerCard } from '../types';
@@ -85,7 +87,8 @@ const SalesInvoicePage: React.FC = () => {
     taxOffice: '',
     taxNumber: '',
     address: '',
-    description: ''
+    description: '',
+    specialCode1: ''
   });
 
   // Line Entry State
@@ -152,7 +155,8 @@ const SalesInvoicePage: React.FC = () => {
           taxOffice: detail.taxOffice,
           taxNumber: detail.taxNumber,
           address: detail.address,
-          description: detail.description
+          description: detail.description,
+          specialCode1: detail.specialCode1
         });
         setItems(detail.items || []);
         setIsEditMode(true);
@@ -169,9 +173,20 @@ const SalesInvoicePage: React.FC = () => {
     }
   };
 
+  const getSpecialCodeFromProject = (projectCode: string): string => {
+    if (!projectCode) return '';
+    if (projectCode.startsWith('3')) return 'F';
+    if (projectCode.startsWith('2')) return 'S';
+    if (projectCode.startsWith('1')) return 'M';
+    return '';
+  };
+
   const handleCustomerChange = (code: string) => {
     const customer = customers.find(c => c.code === code);
     if (customer) {
+      const pCode = customer.projectCode || '';
+      const sCode = getSpecialCodeFromProject(pCode) || customer.specialCode1 || '';
+      
       setInvoiceHeader(prev => ({
         ...prev,
         customerCode: code,
@@ -179,7 +194,8 @@ const SalesInvoicePage: React.FC = () => {
         taxOffice: customer.taxOffice || '',
         taxNumber: customer.taxNumber || '',
         address: `${customer.name} - ${customer.phone || ''}`,
-        projectCode: customer.projectCode || '' // Cari seçildiğinde proje kodunu otomatik doldur
+        projectCode: pCode,
+        specialCode1: sCode
       }));
     }
   };
@@ -243,7 +259,11 @@ const SalesInvoicePage: React.FC = () => {
 
       const dataToSave = {
         ...invoiceHeader,
-        items,
+        items: items.map(item => ({
+          ...item,
+          invoiceNo: invoiceHeader.invoiceNo,
+          customerCode: invoiceHeader.customerCode
+        })),
         totalAmount: totals.grandTotal
       };
       const result = await apiService.salesInvoices.save(dataToSave);
@@ -261,7 +281,8 @@ const SalesInvoicePage: React.FC = () => {
           taxOffice: '',
           taxNumber: '',
           address: '',
-          description: ''
+          description: '',
+          specialCode1: ''
         });
         setItems([]);
         // Refresh next number for the next entry
@@ -463,7 +484,8 @@ const SalesInvoicePage: React.FC = () => {
                     taxOffice: '',
                     taxNumber: '',
                     address: '',
-                    description: ''
+                    description: '',
+                    specialCode1: ''
                   });
                   setItems([]);
                   setIsEditMode(false);
@@ -868,7 +890,7 @@ const SalesInvoicePage: React.FC = () => {
                       </div>
                    </div>
 
-                   <div className="md:col-span-2 space-y-2">
+                   <div className="md:col-span-1 space-y-2">
                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-2">
                          <Briefcase size={14} className="text-indigo-500" /> Proje Kodu
                       </label>
@@ -879,6 +901,19 @@ const SalesInvoicePage: React.FC = () => {
                         placeholder="Cari seçildiğinde otomatik gelir"
                         className="w-full px-5 py-3 bg-slate-100 border border-slate-200 rounded-2xl text-sm font-bold outline-none text-slate-600"
                         value={invoiceHeader.projectCode}
+                      />
+                   </div>
+
+                   <div className="md:col-span-1 space-y-2">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-2">
+                         <Tag size={14} className="text-indigo-500" /> Özel Kod 1
+                      </label>
+                      <input 
+                        type="text"
+                        disabled={!canEdit}
+                        readOnly
+                        className="w-full px-5 py-3 bg-slate-100 border border-slate-200 rounded-2xl text-sm font-bold outline-none text-slate-600"
+                        value={invoiceHeader.specialCode1}
                       />
                    </div>
                 </div>
