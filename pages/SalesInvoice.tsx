@@ -35,7 +35,9 @@ import { apiService } from '../api';
 
 const SalesInvoicePage: React.FC = () => {
   const today = new Date().toISOString().split('T')[0];
-  const [activeTab, setActiveTab] = useState<'header' | 'lines'>('header');
+  const [activeTab, setActiveTab] = useState<'header' | 'lines' | 'history'>('header');
+  const [history, setHistory] = useState<any[]>([]);
+  const [isHistoryLoading, setIsHistoryLoading] = useState(false);
   const [isPreviewMode, setIsPreviewMode] = useState(false);
   const [eWaybillDetails, setEWaybillDetails] = useState<any>(null);
   const [items, setItems] = useState<InvoiceItem[]>([]);
@@ -103,7 +105,16 @@ const SalesInvoicePage: React.FC = () => {
         setStocks(stockList);
         setCustomers(customerList);
         if (nextNo && nextNo.nextNo) {
-          setInvoiceHeader(prev => ({ ...prev, invoiceNo: nextNo.nextNo }));
+          let formattedNo = nextNo.nextNo;
+          // Eğer numara EIR ile başlamıyorsa ve 2026 ile başlıyorsa düzelt
+          if (!formattedNo.startsWith('EIR')) {
+            if (formattedNo.startsWith('2026')) {
+              formattedNo = 'EIR' + formattedNo.substring(4).padStart(12, '0');
+            } else {
+              formattedNo = 'EIR' + formattedNo.padStart(12, '0');
+            }
+          }
+          setInvoiceHeader(prev => ({ ...prev, invoiceNo: formattedNo }));
         }
       } catch (error) {
         console.error('Data fetch error:', error);
@@ -113,6 +124,52 @@ const SalesInvoicePage: React.FC = () => {
     };
     fetchData();
   }, []);
+
+  useEffect(() => {
+    if (activeTab === 'history') {
+      fetchHistory();
+    }
+  }, [activeTab]);
+
+  const fetchHistory = async () => {
+    setIsHistoryLoading(true);
+    try {
+      const data = await apiService.salesInvoices.getAll();
+      setHistory(data || []);
+    } catch (error) {
+      console.error('History fetch error:', error);
+    } finally {
+      setIsHistoryLoading(false);
+    }
+  };
+
+  const handleViewDetail = async (invoiceNo: string) => {
+    setIsLoading(true);
+    try {
+      const detail = await apiService.salesInvoices.getDetail(invoiceNo);
+      if (detail) {
+        setInvoiceHeader({
+          invoiceNo: detail.invoiceNo,
+          date: detail.date?.split('T')[0],
+          deliveryDate: detail.deliveryDate?.split('T')[0],
+          customerCode: detail.customerCode,
+          customerName: detail.customerName,
+          projectCode: detail.projectCode,
+          taxOffice: detail.taxOffice,
+          taxNumber: detail.taxNumber,
+          address: detail.address,
+          description: detail.description
+        });
+        setItems(detail.items || []);
+        setActiveTab('header');
+      }
+    } catch (error) {
+      console.error('Detail fetch error:', error);
+      alert('Detaylar alınırken bir hata oluştu.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleCustomerChange = (code: string) => {
     const customer = customers.find(c => c.code === code);
@@ -416,9 +473,110 @@ const SalesInvoicePage: React.FC = () => {
         >
           <Layers size={16} /> DETAY SATIRLARI
         </button>
+        <button 
+          onClick={() => setActiveTab('history')}
+          className={`flex items-center gap-3 px-8 py-3 rounded-xl text-xs font-black transition-all ${activeTab === 'history' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-100' : 'text-slate-400 hover:text-slate-600'}`}
+        >
+          <FileSpreadsheet size={16} /> GEÇMİŞ İRSALİYELER
+        </button>
       </div>
 
-      {activeTab === 'header' ? (
+      {activeTab === 'history' ? (
+        <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden animate-in fade-in duration-500">
+          <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+            <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest">Geçmiş İrsaliye Kayıtları</h3>
+            <button 
+              onClick={fetchHistory}
+              className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+              title="Yenile"
+            >
+              <Loader2 size={18} className={isHistoryLoading ? 'animate-spin' : ''} />
+            </button>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse min-w-[1000px]">
+              <thead>
+                <tr className="bg-slate-50/50 border-b border-slate-200">
+                  <th className="px-6 py-4 text-[11px] font-black text-slate-400 uppercase tracking-widest">İrsaliye No</th>
+                  <th className="px-6 py-4 text-[11px] font-black text-slate-400 uppercase tracking-widest">Tarih</th>
+                  <th className="px-6 py-4 text-[11px] font-black text-slate-400 uppercase tracking-widest">Müşteri</th>
+                  <th className="px-6 py-4 text-[11px] font-black text-slate-400 uppercase tracking-widest">Proje</th>
+                  <th className="px-6 py-4 text-[11px] font-black text-slate-400 uppercase tracking-widest text-right">Toplam Tutar</th>
+                  <th className="px-6 py-4 text-right w-16">İşlem</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {isHistoryLoading ? (
+                  <tr>
+                    <td colSpan={6} className="px-6 py-12 text-center">
+                      <Loader2 className="animate-spin text-indigo-600 mx-auto" size={24} />
+                      <p className="text-xs text-slate-400 mt-2 font-bold uppercase">Veriler Yükleniyor...</p>
+                    </td>
+                  </tr>
+                ) : history.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="px-6 py-12 text-center">
+                      <p className="text-sm text-slate-400 font-bold uppercase">Kayıt Bulunmuyor</p>
+                    </td>
+                  </tr>
+                ) : (
+                  history.map((inv) => (
+                    <tr key={inv.invoiceNo} className="hover:bg-indigo-50/20 transition-all group">
+                      <td className="px-6 py-4">
+                        <span className="text-sm font-black text-indigo-600 font-mono tracking-tight">{inv.invoiceNo}</span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className="text-xs font-bold text-slate-600">{new Date(inv.date).toLocaleDateString('tr-TR')}</span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div>
+                          <p className="text-sm font-black text-slate-800 tracking-tight leading-none mb-1 uppercase">{inv.customerName}</p>
+                          <p className="text-[10px] text-slate-400 font-bold uppercase">{inv.customerCode}</p>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className="px-2 py-1 bg-slate-100 text-slate-500 rounded text-[10px] font-black uppercase">{inv.projectCode || '-'}</span>
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <span className="text-sm font-black text-slate-800">₺{inv.totalAmount?.toLocaleString(undefined, {minimumFractionDigits: 2})}</span>
+                      </td>
+                      <td className="px-6 py-4 text-right flex items-center justify-end gap-2">
+                        <button 
+                          onClick={() => handleViewDetail(inv.invoiceNo)}
+                          className="p-2 text-indigo-600 hover:bg-indigo-100 rounded-lg transition-all"
+                          title="Detay Gör"
+                        >
+                          <ArrowRight size={18} />
+                        </button>
+                        <button 
+                          onClick={async () => {
+                            if (window.confirm(`${inv.invoiceNo} numaralı irsaliyeyi silmek istediğinize emin misiniz?`)) {
+                              try {
+                                const res = await apiService.salesInvoices.delete(inv.invoiceNo);
+                                if (res.success) {
+                                  alert('İrsaliye silindi.');
+                                  fetchHistory();
+                                }
+                              } catch (error) {
+                                console.error('Delete error:', error);
+                                alert('Silinirken hata oluştu.');
+                              }
+                            }
+                          }}
+                          className="p-2 text-rose-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"
+                          title="Sil"
+                        >
+                          <Trash2 size={18} />
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ) : activeTab === 'header' ? (
         <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 animate-in slide-in-from-left-4 duration-500">
           <div className="xl:col-span-5 space-y-6">
              <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm space-y-8">
@@ -432,18 +590,18 @@ const SalesInvoicePage: React.FC = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                    <div className="md:col-span-2 space-y-2">
                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 flex justify-between">
-                         <span>Fiş / İrsaliye No (16 Hane)</span>
-                         <span className={`${invoiceHeader.invoiceNo.length === 16 ? 'text-indigo-500' : 'text-rose-500'}`}>{invoiceHeader.invoiceNo.length}/16</span>
+                         <span>Fiş / İrsaliye No (EIR + 12 Hane)</span>
+                         <span className={`${invoiceHeader.invoiceNo?.length === 15 ? 'text-indigo-500' : 'text-rose-500'}`}>{invoiceHeader.invoiceNo?.length}/15</span>
                       </label>
                       <div className="relative">
                          <input 
                            type="text" 
-                           maxLength={16}
+                           maxLength={15}
                            disabled={!canEdit}
                            className="w-full pl-12 pr-5 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-black text-slate-800 outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all font-mono" 
-                           placeholder="2024000000000001"
+                           placeholder="EIR000000000001"
                            value={invoiceHeader.invoiceNo}
-                           onChange={(e) => setInvoiceHeader({...invoiceHeader, invoiceNo: e.target.value})}
+                           onChange={(e) => setInvoiceHeader({...invoiceHeader, invoiceNo: e.target.value.toUpperCase()})}
                          />
                          <Hash className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
                       </div>
