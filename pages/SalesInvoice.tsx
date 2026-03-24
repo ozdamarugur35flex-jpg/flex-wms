@@ -45,6 +45,8 @@ const SalesInvoicePage: React.FC = () => {
   const [customers, setCustomers] = useState<CustomerCard[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [isFetchingDetail, setIsFetchingDetail] = useState(false);
   
   // Search States
   const [customerSearch, setCustomerSearch] = useState('');
@@ -97,25 +99,13 @@ const SalesInvoicePage: React.FC = () => {
     const fetchData = async () => {
       setIsLoading(true);
       try {
-        const [stockList, customerList, nextNo] = await Promise.all([
+        const [stockList, customerList] = await Promise.all([
           apiService.stocks.getAll(),
-          apiService.customers.getAll(),
-          apiService.salesInvoices.generateNextNo()
+          apiService.customers.getAll()
         ]);
         setStocks(stockList);
         setCustomers(customerList);
-        if (nextNo && nextNo.nextNo) {
-          let formattedNo = nextNo.nextNo;
-          // Eğer numara EIR ile başlamıyorsa ve 2026 ile başlıyorsa düzelt
-          if (!formattedNo.startsWith('EIR')) {
-            if (formattedNo.startsWith('2026')) {
-              formattedNo = 'EIR' + formattedNo.substring(4).padStart(12, '0');
-            } else {
-              formattedNo = 'EIR' + formattedNo.padStart(12, '0');
-            }
-          }
-          setInvoiceHeader(prev => ({ ...prev, invoiceNo: formattedNo }));
-        }
+        // "BOS DURUMDA NUMARA VERMESIN" - Do not auto-fill next number on mount
       } catch (error) {
         console.error('Data fetch error:', error);
       } finally {
@@ -145,6 +135,8 @@ const SalesInvoicePage: React.FC = () => {
 
   const handleViewDetail = async (invoiceNo: string) => {
     setIsLoading(true);
+    setIsFetchingDetail(true);
+    setItems([]); // Clear current items before fetching new ones
     try {
       const detail = await apiService.salesInvoices.getDetail(invoiceNo);
       if (detail) {
@@ -161,13 +153,17 @@ const SalesInvoicePage: React.FC = () => {
           description: detail.description
         });
         setItems(detail.items || []);
+        setIsEditMode(true);
         setActiveTab('header');
+      } else {
+        alert('İrsaliye bulunamadı.');
       }
     } catch (error) {
       console.error('Detail fetch error:', error);
       alert('Detaylar alınırken bir hata oluştu.');
     } finally {
       setIsLoading(false);
+      setIsFetchingDetail(false);
     }
   };
 
@@ -235,6 +231,14 @@ const SalesInvoicePage: React.FC = () => {
 
     setIsSaving(true);
     try {
+      // Eğer düzenleme modundaysak önce eski kaydı siliyoruz (Netsis entegrasyonu için güvenli yöntem)
+      if (isEditMode) {
+        const deleteRes = await apiService.salesInvoices.delete(invoiceHeader.invoiceNo!);
+        if (!deleteRes.success) {
+          throw new Error('Eski kayıt silinemediği için güncelleme yapılamıyor.');
+        }
+      }
+
       const dataToSave = {
         ...invoiceHeader,
         items,
@@ -242,12 +246,39 @@ const SalesInvoicePage: React.FC = () => {
       };
       const result = await apiService.salesInvoices.save(dataToSave);
       if (result.success) {
-        alert('İrsaliye başarıyla Netsis taslaklarına kaydedildi.');
-        // Reset or redirect
+        alert(isEditMode ? 'İrsaliye başarıyla güncellendi.' : 'İrsaliye başarıyla Netsis taslaklarına kaydedildi.');
+        setIsEditMode(false);
+        // Reset form after save
+        setInvoiceHeader({
+          invoiceNo: '',
+          date: today,
+          deliveryDate: today,
+          customerCode: '',
+          customerName: '',
+          projectCode: '',
+          taxOffice: '',
+          taxNumber: '',
+          address: '',
+          description: ''
+        });
+        setItems([]);
+        // Refresh next number for the next entry
+        const nextNo = await apiService.salesInvoices.generateNextNo();
+        if (nextNo && nextNo.nextNo) {
+          let formattedNo = nextNo.nextNo;
+          if (!formattedNo.startsWith('EIR')) {
+            if (formattedNo.startsWith('2026')) {
+              formattedNo = 'EIR' + formattedNo.substring(4).padStart(12, '0');
+            } else {
+              formattedNo = 'EIR' + formattedNo.padStart(12, '0');
+            }
+          }
+          setInvoiceHeader(prev => ({ ...prev, invoiceNo: formattedNo }));
+        }
       }
     } catch (error) {
       console.error('Save error:', error);
-      alert('Kaydedilirken bir hata oluştu.');
+      alert('Kaydedilirken bir hata oluştu: ' + (error instanceof Error ? error.message : 'Bilinmeyen hata'));
     } finally {
       setIsSaving(false);
     }
@@ -280,7 +311,7 @@ const SalesInvoicePage: React.FC = () => {
     return { subTotal, vatTotal, grandTotal: subTotal + vatTotal };
   }, [items]);
 
-  const canEdit = invoiceHeader.date === today;
+  const canEdit = invoiceHeader.date === today || isEditMode;
 
   if (isLoading) {
     return (
@@ -404,7 +435,7 @@ const SalesInvoicePage: React.FC = () => {
           {canEdit && (
             <>
               <button 
-                onClick={() => {
+                onClick={async () => {
                   setInvoiceHeader({
                     invoiceNo: '',
                     date: today,
@@ -418,6 +449,28 @@ const SalesInvoicePage: React.FC = () => {
                     description: ''
                   });
                   setItems([]);
+                  setIsEditMode(false);
+                  
+                  // Fetch next number when "New" is clicked
+                  setIsLoading(true);
+                  try {
+                    const nextNo = await apiService.salesInvoices.generateNextNo();
+                    if (nextNo && nextNo.nextNo) {
+                      let formattedNo = nextNo.nextNo;
+                      if (!formattedNo.startsWith('EIR')) {
+                        if (formattedNo.startsWith('2026')) {
+                          formattedNo = 'EIR' + formattedNo.substring(4).padStart(12, '0');
+                        } else {
+                          formattedNo = 'EIR' + formattedNo.padStart(12, '0');
+                        }
+                      }
+                      setInvoiceHeader(prev => ({ ...prev, invoiceNo: formattedNo }));
+                    }
+                  } catch (err) {
+                    console.error('Next no fetch error:', err);
+                  } finally {
+                    setIsLoading(false);
+                  }
                 }}
                 className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-600 rounded-xl text-xs font-bold hover:bg-slate-50 active:scale-95 transition-all"
               >
@@ -593,17 +646,33 @@ const SalesInvoicePage: React.FC = () => {
                          <span>Fiş / İrsaliye No (EIR + 12 Hane)</span>
                          <span className={`${invoiceHeader.invoiceNo?.length === 15 ? 'text-indigo-500' : 'text-rose-500'}`}>{invoiceHeader.invoiceNo?.length}/15</span>
                       </label>
-                      <div className="relative">
+                      <div className="relative group">
                          <input 
                            type="text" 
                            maxLength={15}
-                           disabled={!canEdit}
-                           className="w-full pl-12 pr-5 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-black text-slate-800 outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all font-mono" 
+                           disabled={!canEdit || isFetchingDetail}
+                           className="w-full pl-12 pr-12 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-black text-slate-800 outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all font-mono" 
                            placeholder="EIR000000000001"
                            value={invoiceHeader.invoiceNo}
-                           onChange={(e) => setInvoiceHeader({...invoiceHeader, invoiceNo: e.target.value.toUpperCase()})}
+                           onChange={(e) => {
+                             setInvoiceHeader({...invoiceHeader, invoiceNo: e.target.value.toUpperCase()});
+                             setIsEditMode(false); // Numara değişirse edit modundan çık
+                           }}
+                           onKeyDown={(e) => {
+                             if (e.key === 'Enter' && invoiceHeader.invoiceNo) {
+                               handleViewDetail(invoiceHeader.invoiceNo);
+                             }
+                           }}
                          />
                          <Hash className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
+                         <button
+                           onClick={() => invoiceHeader.invoiceNo && handleViewDetail(invoiceHeader.invoiceNo)}
+                           disabled={!invoiceHeader.invoiceNo || isFetchingDetail}
+                           className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-100 transition-all disabled:opacity-50"
+                           title="İrsaliye Ara / Getir"
+                         >
+                           {isFetchingDetail ? <Loader2 size={16} className="animate-spin" /> : <Search size={16} />}
+                         </button>
                       </div>
                    </div>
                    

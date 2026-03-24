@@ -489,6 +489,12 @@ async function startServer() {
     res.json({ success: true, message: "Satış irsaliyesi Netsis'e (Sim) taslak olarak kaydedildi." });
   });
 
+  app.delete("/api/salesinvoices/:invoiceNo", (req, res) => {
+    const { invoiceNo } = req.params;
+    salesInvoices = salesInvoices.filter(i => i.invoiceNo !== invoiceNo);
+    res.json({ success: true, message: "İrsaliye silindi." });
+  });
+
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
