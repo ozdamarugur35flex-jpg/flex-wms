@@ -47,6 +47,8 @@ const SalesInvoicePage: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [isFetchingDetail, setIsFetchingDetail] = useState(false);
+  const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
+  const [historySearch, setHistorySearch] = useState('');
   
   // Search States
   const [customerSearch, setCustomerSearch] = useState('');
@@ -305,6 +307,21 @@ const SalesInvoicePage: React.FC = () => {
     }));
   };
 
+  const filteredHistory = useMemo(() => {
+    if (!historySearch) return history;
+    const lowerSearch = historySearch.toLowerCase();
+    return history.filter(h => 
+      h.invoiceNo.toLowerCase().includes(lowerSearch) || 
+      h.customerName.toLowerCase().includes(lowerSearch) ||
+      h.customerCode.toLowerCase().includes(lowerSearch)
+    );
+  }, [history, historySearch]);
+
+  const handleSelectFromHistory = (invoiceNo: string) => {
+    handleViewDetail(invoiceNo);
+    setIsHistoryModalOpen(false);
+  };
+
   const totals = useMemo(() => {
     const subTotal = items.reduce((acc, curr) => acc + (curr.price * curr.quantity), 0);
     const vatTotal = items.reduce((acc, curr) => acc + ((curr.price * curr.quantity) * curr.vat / 100), 0);
@@ -498,6 +515,100 @@ const SalesInvoicePage: React.FC = () => {
         </div>
       </div>
 
+      {/* HISTORY SELECTION MODAL */}
+      {isHistoryModalOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300">
+          <div className="bg-white w-full max-w-4xl max-h-[80vh] rounded-[2.5rem] shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-300">
+            <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+              <div>
+                <h3 className="text-lg font-black text-slate-800 uppercase tracking-tight">Geçmiş İrsaliye Seçimi</h3>
+                <p className="text-xs text-slate-400 font-bold uppercase">Düzenlemek istediğiniz irsaliyeyi listeden seçiniz</p>
+              </div>
+              <button 
+                onClick={() => setIsHistoryModalOpen(false)}
+                className="p-2 hover:bg-rose-50 text-slate-400 hover:text-rose-500 rounded-xl transition-all"
+              >
+                <XCircle size={24} />
+              </button>
+            </div>
+
+            <div className="p-4 border-b border-slate-100">
+              <div className="relative">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                <input 
+                  type="text"
+                  placeholder="İrsaliye No, Müşteri Adı veya Kodu ile ara..."
+                  className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all"
+                  value={historySearch}
+                  onChange={(e) => setHistorySearch(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-4">
+              <table className="w-full text-left border-collapse">
+                <thead className="sticky top-0 bg-white z-10">
+                  <tr className="border-b border-slate-200">
+                    <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">İrsaliye No</th>
+                    <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">Tarih</th>
+                    <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">Müşteri</th>
+                    <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Tutar</th>
+                    <th className="px-4 py-3 text-right w-10"></th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {isHistoryLoading ? (
+                    <tr>
+                      <td colSpan={5} className="py-20 text-center">
+                        <Loader2 className="animate-spin text-indigo-600 mx-auto" size={32} />
+                        <p className="text-xs text-slate-400 mt-4 font-black uppercase">Kayıtlar Getiriliyor...</p>
+                      </td>
+                    </tr>
+                  ) : filteredHistory.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="py-20 text-center">
+                        <p className="text-sm text-slate-400 font-bold uppercase tracking-widest">Eşleşen Kayıt Bulunamadı</p>
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredHistory.map((inv) => (
+                      <tr 
+                        key={inv.invoiceNo} 
+                        className="hover:bg-indigo-50/50 cursor-pointer transition-all group"
+                        onClick={() => handleSelectFromHistory(inv.invoiceNo)}
+                      >
+                        <td className="px-4 py-4">
+                          <span className="text-sm font-black text-indigo-600 font-mono">{inv.invoiceNo}</span>
+                        </td>
+                        <td className="px-4 py-4">
+                          <span className="text-xs font-bold text-slate-600">{new Date(inv.date).toLocaleDateString('tr-TR')}</span>
+                        </td>
+                        <td className="px-4 py-4">
+                          <p className="text-sm font-black text-slate-800 leading-none mb-1 uppercase">{inv.customerName}</p>
+                          <p className="text-[10px] text-slate-400 font-bold uppercase">{inv.customerCode}</p>
+                        </td>
+                        <td className="px-4 py-4 text-right">
+                          <span className="text-sm font-black text-slate-800">₺{inv.totalAmount?.toLocaleString(undefined, {minimumFractionDigits: 2})}</span>
+                        </td>
+                        <td className="px-4 py-4 text-right">
+                          <div className="w-8 h-8 bg-indigo-50 text-indigo-600 rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all">
+                            <ArrowRight size={16} />
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+            
+            <div className="p-4 bg-slate-50 border-t border-slate-100 text-center">
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Toplam {filteredHistory.length} Kayıt Listeleniyor</p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* EIR ALERT NOTIFICATION */}
       <div className="bg-amber-50 border-l-4 border-amber-500 p-4 rounded-xl flex items-center justify-between shadow-sm animate-pulse">
          <div className="flex items-center gap-4">
@@ -665,14 +776,26 @@ const SalesInvoicePage: React.FC = () => {
                            }}
                          />
                          <Hash className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
-                         <button
-                           onClick={() => invoiceHeader.invoiceNo && handleViewDetail(invoiceHeader.invoiceNo)}
-                           disabled={!invoiceHeader.invoiceNo || isFetchingDetail}
-                           className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-100 transition-all disabled:opacity-50"
-                           title="İrsaliye Ara / Getir"
-                         >
-                           {isFetchingDetail ? <Loader2 size={16} className="animate-spin" /> : <Search size={16} />}
-                         </button>
+                         <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                            <button
+                              onClick={() => {
+                                fetchHistory();
+                                setIsHistoryModalOpen(true);
+                              }}
+                              className="p-1.5 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 transition-all"
+                              title="Geçmişten Seç"
+                            >
+                              <FileSpreadsheet size={16} />
+                            </button>
+                            <button
+                              onClick={() => invoiceHeader.invoiceNo && handleViewDetail(invoiceHeader.invoiceNo)}
+                              disabled={!invoiceHeader.invoiceNo || isFetchingDetail}
+                              className="p-1.5 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-100 transition-all disabled:opacity-50"
+                              title="İrsaliye Ara / Getir"
+                            >
+                              {isFetchingDetail ? <Loader2 size={16} className="animate-spin" /> : <Search size={16} />}
+                            </button>
+                         </div>
                       </div>
                    </div>
                    
