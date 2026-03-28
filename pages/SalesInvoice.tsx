@@ -765,7 +765,7 @@ const SalesInvoicePage: React.FC = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                    <div className="md:col-span-2 space-y-2">
                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 flex justify-between">
-                         <span>Fiş / İrsaliye No (EIR + 12 Hane)</span>
+                         <span>Fiş / İrsaliye No (EIR + YIL + 8 Hane)</span>
                          <span className={`${invoiceHeader.invoiceNo?.length === 15 ? 'text-indigo-500' : 'text-rose-500'}`}>{invoiceHeader.invoiceNo?.length}/15</span>
                       </label>
                       <div className="relative group">
@@ -774,7 +774,7 @@ const SalesInvoicePage: React.FC = () => {
                            maxLength={15}
                            disabled={!canEdit || isFetchingDetail}
                            className="w-full pl-12 pr-12 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-black text-slate-800 outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all font-mono" 
-                           placeholder="EIR000000000001"
+                           placeholder="EIR202400000001"
                            value={invoiceHeader.invoiceNo}
                            onChange={(e) => {
                              setInvoiceHeader({...invoiceHeader, invoiceNo: e.target.value.toUpperCase()});

@@ -108,10 +108,8 @@ namespace tuckapi.Controllers
 
                 DateTime docDate = string.IsNullOrEmpty(request.Date) ? DateTime.Now : DateTime.Parse(request.Date);
                 string cleanNo = new string((request.InvoiceNo ?? "").Replace("EIR", "").Where(char.IsDigit).ToArray());
-                string finalInvoiceNo = "EIR" + cleanNo.PadLeft(12, '0');
+                string finalInvoiceNo = "EIR" + cleanNo.PadLeft(12, '0'); // 3 + 12 = 15
                 if (finalInvoiceNo.Length > 15) finalInvoiceNo = finalInvoiceNo.Substring(0, 15);
-
-                string gibNo = "EIR" + docDate.Year.ToString() + finalInvoiceNo.Substring(finalInvoiceNo.Length - 9);
 
                 decimal calculatedBrut = 0;
                 decimal calculatedKdv = 0;
@@ -122,9 +120,9 @@ namespace tuckapi.Controllers
                     string stockInfoSql = "SELECT SATIS_FIAT1, KDV_ORANI FROM TBLSTSABIT WHERE STOK_KODU = @StockCode";
                     var stockInfo = await conn.QueryFirstOrDefaultAsync(stockInfoSql, new { item.StockCode }, transaction);
 
-                    decimal realPrice = (stockInfo != null && Convert.ToDecimal(stockInfo.SATIS_FIAT1) > 0)
-                                        ? Convert.ToDecimal(stockInfo.SATIS_FIAT1) : (item.Price > 0 ? item.Price : 0);
-                    decimal realVatRate = stockInfo != null ? Convert.ToDecimal(stockInfo.KDV_ORANI) : (item.Vat > 0 ? item.Vat : 20);
+                    // KDV ve Fiyat SADECE stok kartından (TBLSTSABIT) gelecek
+                    decimal realPrice = stockInfo != null ? Convert.ToDecimal(stockInfo.SATIS_FIAT1) : 0;
+                    decimal realVatRate = stockInfo != null ? Convert.ToDecimal(stockInfo.KDV_ORANI) : 20;
 
                     decimal lineBrut = item.Quantity * realPrice;
                     decimal lineVat = lineBrut * (realVatRate / 100);
@@ -147,7 +145,7 @@ namespace tuckapi.Controllers
                         FATKALEM_ADEDI, ONAYTIPI, ONAYNUM, VADEBAZT,
                         ODEMETARIHI, SIPARIS_TEST, KS_KODU, HALFAT, UPDATE_KODU
                     ) VALUES (
-                        0, '3', @InvoiceNo, @CustomerCode, @Date, 2, 
+                        0, 3, @InvoiceNo, @CustomerCode, @Date, 2, 
                         @BrutTutar, @GenelToplam, @KdvTutar, @Description, 
                         @Kod1, 'H', 'S', 'X', 1,
                         1, GETDATE(), 'FLEX_WMS', @GibInvoiceNo, @ProjectCode,
@@ -164,7 +162,7 @@ namespace tuckapi.Controllers
                     GenelToplam = calculatedGenelToplam,
                     KdvTutar = calculatedKdv,
                     Description = request.Description ?? "",
-                    GibInvoiceNo = gibNo,
+                    GibInvoiceNo = string.Empty,
                     ProjectCode = request.ProjectCode,
                     ItemCount = processedItems.Count,
                     Kod1 = stharKod1
@@ -191,15 +189,15 @@ namespace tuckapi.Controllers
                             STHAR_BGTIP, STHAR_KOD1, STHAR_CARIKOD, CEVRIM, 
                             STHAR_KDV, LISTE_FIAT, STHAR_DOVTIP, STHAR_DOVFIAT, 
                             STHAR_ACIKLAMA, UPDATE_KODU, STHAR_TESTAR,
-                            IRSALIYE_NO, IRSALIYE_TARIH
+                            IRSALIYE_NO, IRSALIYE_TARIH, STHAR_SIP_TURU, PROJE_KODU
                         ) VALUES (
                             @InvoiceNo, @StockCode, @Quantity, 'C',
-                            '3', 'H', @Date, @Price, @Price,
+                            3, 'H', @Date, @Price, @Price,
                             100, 1, 0, @Sira,
                             'I', @StharKod1, @CustomerCode, 0,
                             @VatRate, @Price, 0, 0, 
                             @CustomerCode, 'F', @Date,
-                            @InvoiceNo, @Date
+                            @InvoiceNo, @Date, 0, @ProjectCode
                         )";
 
                     await conn.ExecuteAsync(sqlItem, new
@@ -211,29 +209,11 @@ namespace tuckapi.Controllers
                         item.Price,
                         Sira = sira++,
                         request.CustomerCode,
-                        item.VatRate,
-                        StharKod1 = stharKod1
+                        VatRate = item.VatRate,
+                        StharKod1 = stharKod1,
+                        ProjectCode = request.ProjectCode
                     }, transaction);
                 }
-
-                // D. TBLCAHAR (CARİ HAREKET)
-                string sqlCari = @"
-                    INSERT INTO TBLCAHAR (
-                        SUBE_KODU, CARI_KOD, TARIH, VADE_TARIHI, BELGE_NO, ACIKLAMA, 
-                        HKA, BORC, ALACAK, HAREKET_TURU, DOVIZ_TURU, DOVIZ_TUTAR, PROJE_KODU, UPDATE_KODU
-                    ) VALUES (
-                        0, @CustomerCode, @Date, @Date, @InvoiceNo, 'Satış İrsaliyesi', 
-                        'A', @TotalAmount, 0, 'B', 0, 0, @ProjectCode, 'F'
-                    )";
-
-                await conn.ExecuteAsync(sqlCari, new
-                {
-                    request.CustomerCode,
-                    Date = docDate,
-                    InvoiceNo = finalInvoiceNo,
-                    TotalAmount = calculatedGenelToplam,
-                    ProjectCode = request.ProjectCode
-                }, transaction);
 
                 transaction.Commit();
                 return Ok(new { success = true, message = "İrsaliye kaydedildi.", invoiceNo = finalInvoiceNo });
@@ -254,7 +234,6 @@ namespace tuckapi.Controllers
             try
             {
                 await conn.ExecuteAsync("DELETE FROM TBLSTHAR WHERE FISNO = @invoiceNo AND STHAR_FTIRSIP = '3'", new { invoiceNo }, transaction);
-                await conn.ExecuteAsync("DELETE FROM TBLCAHAR WHERE BELGE_NO = @invoiceNo AND HAREKET_TURU = 'B'", new { invoiceNo }, transaction);
                 await conn.ExecuteAsync("DELETE FROM TBLFATUEK WHERE FATIRSNO = @invoiceNo", new { invoiceNo }, transaction);
                 await conn.ExecuteAsync("DELETE FROM TBLFATUIRS WHERE FATIRS_NO = @invoiceNo AND FTIRSIP = '3'", new { invoiceNo }, transaction);
 
@@ -274,16 +253,19 @@ namespace tuckapi.Controllers
             try
             {
                 using var conn = new SqlConnection(_connStr);
-                string sql = @"SELECT TOP 1 FATIRS_NO FROM TBLFATUIRS WHERE FTIRSIP = '3' AND FATIRS_NO LIKE 'EIR%' ORDER BY FATIRS_NO DESC";
-                var lastNo = await conn.QueryFirstOrDefaultAsync<string>(sql);
-                string prefix = "EIR";
+                string year = DateTime.Now.Year.ToString();
+                string prefix = "EIR" + year; // EIR2024
+                
+                string sql = @"SELECT TOP 1 FATIRS_NO FROM TBLFATUIRS WHERE FTIRSIP = '3' AND FATIRS_NO LIKE @prefix + '%' ORDER BY FATIRS_NO DESC";
+                var lastNo = await conn.QueryFirstOrDefaultAsync<string>(sql, new { prefix });
 
-                if (string.IsNullOrEmpty(lastNo)) return Ok(new { nextNo = prefix + "000000000001" });
+                if (string.IsNullOrEmpty(lastNo)) return Ok(new { nextNo = prefix + "00000001" });
 
                 string numberPart = lastNo.Replace(prefix, "");
                 if (long.TryParse(numberPart, out long currentNum))
                 {
-                    string nextNo = prefix + (currentNum + 1).ToString().PadLeft(12, '0');
+                    // 8 hane padding (EIR + 4 + 8 = 15)
+                    string nextNo = prefix + (currentNum + 1).ToString().PadLeft(8, '0');
                     return Ok(new { nextNo });
                 }
                 return Ok(new { nextNo = "" });

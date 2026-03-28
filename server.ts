@@ -456,8 +456,8 @@ async function startServer() {
   // --- SALES INVOICE API ---
   let salesInvoices: any[] = [
     {
-      id: 'IRS2024000000001',
-      invoiceNo: 'IRS2024000000001',
+      id: 'EIR2024000000001',
+      invoiceNo: 'EIR2024000000001',
       customerCode: 'C001',
       customerName: 'Aksoy Lojistik Tic. Ltd. Şti.',
       date: '2024-03-12',
@@ -477,18 +477,21 @@ async function startServer() {
   app.get("/api/salesinvoices", (req, res) => res.json(salesInvoices));
   app.get("/api/salesinvoices/next-no", (req, res) => {
     const prefix = "EIR";
+    const year = new Date().getFullYear().toString();
+    const fullPrefix = prefix + year; // e.g. EIR2024
+    
     const eirInvoices = salesInvoices
-      .filter(i => i.invoiceNo && i.invoiceNo.startsWith(prefix))
+      .filter(i => i.invoiceNo && i.invoiceNo.startsWith(fullPrefix))
       .sort((a, b) => b.invoiceNo.localeCompare(a.invoiceNo));
 
     if (eirInvoices.length === 0) {
-      return res.json({ nextNo: prefix + "000000000001" });
+      return res.json({ nextNo: fullPrefix + "00000001" });
     }
 
     const lastNo = eirInvoices[0].invoiceNo;
-    const numberPart = lastNo.replace(prefix, "");
+    const numberPart = lastNo.replace(fullPrefix, "");
     const nextNum = (parseInt(numberPart) || 0) + 1;
-    const nextNo = prefix + nextNum.toString().padStart(12, '0');
+    const nextNo = fullPrefix + nextNum.toString().padStart(8, '0');
     
     res.json({ nextNo });
   });
@@ -518,11 +521,6 @@ async function startServer() {
     const data = req.body;
     const docDate = new Date(data.date || new Date());
     
-    // GIB No Oluşturma (EIR + YIL + Son 9 Hane)
-    const cleanNo = (data.invoiceNo || "").replace(/[^0-9]/g, "");
-    const last9 = cleanNo.slice(-9).padStart(9, '0');
-    const gibNo = `EIR${docDate.getFullYear()}${last9}`;
-
     // Proje koduna göre STHAR_KOD1 (Özel Kod 1) belirleme
     let stharKod1 = "";
     if (data.projectCode) {
@@ -535,11 +533,12 @@ async function startServer() {
     const enrichedData = {
       ...data,
       id: data.invoiceNo,
-      gibInvoiceNo: gibNo,
+      gibInvoiceNo: "",
       deliveryDate: data.deliveryDate || data.date,
       recordedBy: 'FLEX_WMS',
       createdAt: new Date().toISOString(),
-      // Kalemlerin Netsis (TBLSTHAR) ile tam uyumlu olması
+      // NOT: Kullanıcı talebi üzerine TBLCAHAR (Cari Hareket) kaydı yapılmıyor.
+      // Sadece TBLFATUIRS ve TBLSTHAR simüle ediliyor.
       items: (data.items || []).map((item: any, index: number) => {
         const lineBrut = (item.quantity || 0) * (item.price || 0);
         return {
@@ -552,6 +551,7 @@ async function startServer() {
           sthar_bgtip: 'I',             // Netsis Standart: İrsaliye
           update_kodu: 'F',             // Netsis Standart: Fatura/İrsaliye
           sthar_kod1: stharKod1,        // Özel Kod 1
+          sthar_aciklama: data.customerCode, // TBLSTHAR.STHAR_ACIKLAMA (Cari Kodu Yazmalı)
           lineNo: index + 1             // TBLSTHAR.SIRA
         };
       })
