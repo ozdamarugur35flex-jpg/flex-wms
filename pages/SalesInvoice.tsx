@@ -985,12 +985,12 @@ const SalesInvoicePage: React.FC = () => {
       ) : (
         <div className="space-y-6 animate-in slide-in-from-right-4 duration-500">
            {/* QUICK LINE ENTRY */}
-           <div className={`bg-slate-900 p-8 rounded-[2.5rem] text-white shadow-2xl space-y-8 relative overflow-hidden ${!canEdit ? 'opacity-50 grayscale' : ''}`}>
+           <div className={`bg-slate-900 p-8 rounded-[2.5rem] text-white shadow-2xl space-y-8 relative ${!canEdit ? 'opacity-50 grayscale' : ''}`}>
               <div className="absolute top-0 right-0 p-12 opacity-5 pointer-events-none rotate-12">
                  <Layers size={140} />
               </div>
               
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-end relative z-10">
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-end relative z-20">
                  <div className="lg:col-span-5 space-y-2 relative">
                     <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1 flex items-center gap-2">
                        <Box size={14} className="text-indigo-400" /> Stok Kartı Seçimi
