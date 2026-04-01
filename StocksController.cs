@@ -9,7 +9,7 @@ using NetOpenX50; // Versiyonunuza göre NetOpenX90 vb. olabilir
 namespace FlexWms.Api.Controllers
 {
     [ApiController]
-    [Route("api/[controller]")]
+    [Route("[controller]")]
     public class StocksController : ControllerBase
     {
         // Bağlantı dizesini projenize göre buraya sabitleyebilir veya appsettings.json'dan çekebilirsiniz.

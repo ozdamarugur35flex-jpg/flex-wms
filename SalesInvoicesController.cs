@@ -10,7 +10,7 @@ using System.Dynamic;
 namespace tuckapi.Controllers
 {
     [ApiController]
-    [Route("api/[controller]")]
+    [Route("[controller]")]
     public class SalesInvoicesController : ControllerBase
     {
         private readonly string _connStr = "Server=.\\TUCKDB;Database=MERACK26;User Id=sa;Password=Pn123@;TrustServerCertificate=True;";
