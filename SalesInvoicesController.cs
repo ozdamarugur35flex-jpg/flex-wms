@@ -10,7 +10,7 @@ using System.Dynamic;
 namespace tuckapi.Controllers
 {
     [ApiController]
-    [Route("[controller]")]
+    [Route("api/[controller]")]
     public class SalesInvoicesController : ControllerBase
     {
         private readonly string _connStr = "Server=.\\TUCKDB;Database=MERACK26;User Id=sa;Password=Pn123@;TrustServerCertificate=True;";
@@ -25,11 +25,11 @@ namespace tuckapi.Controllers
                     SELECT 
                         F.FATIRS_NO as InvoiceNo,
                         F.CARI_KODU as CustomerCode,
-                        dbo.TRK(ISNULL(C.CARI_ISIM, '')) as CustomerName,
+                        ISNULL(C.CARI_ISIM, '') as CustomerName,
                         F.TARIH as Date,
                         F.GENELTOPLAM as TotalAmount,
                         F.GIB_FATIRS_NO as GibInvoiceNo,
-                        dbo.TRK(ISNULL(F.ACIKLAMA, '')) as Description
+                        ISNULL(F.ACIKLAMA, '') as Description
                     FROM TBLFATUIRS F
                     LEFT JOIN TBLCASABIT C ON C.CARI_KOD = F.CARI_KODU
                     WHERE F.FTIRSIP = '3'
@@ -53,9 +53,10 @@ namespace tuckapi.Controllers
                 var headerSql = @"
                     SELECT 
                         F.FATIRS_NO as InvoiceNo, F.TARIH as Date, F.CARI_KODU as CustomerCode,
-                        dbo.TRK(ISNULL(C.CARI_ISIM, '')) as CustomerName, F.PROJE_KODU as ProjectCode, 
-                        dbo.TRK(ISNULL(F.ACIKLAMA, '')) as Description, C.VERGI_DAIRESI as TaxOffice,
-                        C.VERGI_NUMARASI as TaxNumber, dbo.TRK(ISNULL(C.ADRES, '')) as Address
+                        ISNULL(C.CARI_ISIM, '') as CustomerName, F.PROJE_KODU as ProjectCode, 
+                        ISNULL(F.ACIKLAMA, '') as Description, C.VERGI_DAIRESI as TaxOffice,
+                        C.VERGI_NUMARASI as TaxNumber, ISNULL(C.ADRES, '') as Address,
+                        F.GIB_FATIRS_NO as GibInvoiceNo
                     FROM TBLFATUIRS F
                     LEFT JOIN TBLCASABIT C ON C.CARI_KOD = F.CARI_KODU
                     WHERE F.FATIRS_NO = @invoiceNo AND F.FTIRSIP = '3'";
@@ -73,7 +74,7 @@ namespace tuckapi.Controllers
                 var linesSql = @"
                     SELECT 
                         S.STOK_KODU as StockCode, 
-                        dbo.TRK(ISNULL(SB.STOK_ADI, '')) as StockName,
+                        ISNULL(SB.STOK_ADI, '') as StockName,
                         S.STHAR_GCMIK as Quantity, S.STHAR_NF as Price, S.STHAR_KDV as Vat,
                         (S.STHAR_GCMIK * S.STHAR_NF) as Total,
                         S.DEPO_KODU as WarehouseCode
@@ -90,6 +91,41 @@ namespace tuckapi.Controllers
             catch (Exception ex)
             {
                 return BadRequest(new { message = "Detay getirme hatası: " + ex.Message });
+            }
+        }
+
+        [HttpGet("{invoiceNo}/ewaybill")]
+        public async Task<IActionResult> GetEWaybillDetails(string invoiceNo)
+        {
+            try
+            {
+                using var conn = new SqlConnection(_connStr);
+                var sql = @"
+                    SELECT 
+                        F.GIB_FATIRS_NO as GibInvoiceNo,
+                        'Flex Lojistik' as CarrierName,
+                        '1234567890' as CarrierVkn,
+                        'İSTANBUL' as CarrierCity,
+                        'TUZLA' as CarrierSubCity
+                    FROM TBLFATUIRS F
+                    WHERE F.FATIRS_NO = @invoiceNo AND F.FTIRSIP = '3'";
+
+                var details = await conn.QueryFirstOrDefaultAsync<dynamic>(sql, new { invoiceNo });
+                if (details == null)
+                {
+                    return Ok(new { 
+                        gibInvoiceNo = "TASLAK",
+                        carrierName = "Flex Lojistik",
+                        carrierVkn = "1234567890",
+                        carrierCity = "İSTANBUL",
+                        carrierSubCity = "TUZLA"
+                    });
+                }
+                return Ok(details);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = "E-İrsaliye detay hatası: " + ex.Message });
             }
         }
 

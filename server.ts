@@ -52,7 +52,7 @@ async function startServer() {
       groupCode: 'MAMUL',
       unit1: 'ADET',
       purchaseVat: 1,
-      salesVat: 1,
+      salesVat: null,
       quantity: 500,
       minStockLevel: 100,
       isLocked: false,
