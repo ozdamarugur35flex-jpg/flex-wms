@@ -205,13 +205,30 @@ const SalesInvoicePage: React.FC = () => {
     }
   };
 
-  const handleStockChange = (code: string) => {
+  const handleStockChange = async (code: string) => {
     const stock = stocks.find(s => s.code === code);
+    
+    let currentVat = stock ? stock.salesVat : null;
+    let currentPrice = stock ? (stock.salesPrices?.[0] || 0) : 0;
+
+    // Eğer listede KDV yoksa, detaydan çekmeyi dene
+    if (currentVat === null && code) {
+      try {
+        const detail = await apiService.stocks.getDetail(code);
+        if (detail) {
+          currentVat = detail.salesVat;
+          if (currentPrice === 0) currentPrice = detail.salesPrices?.[0] || 0;
+        }
+      } catch (e) {
+        console.error("Stok detay çekme hatası:", e);
+      }
+    }
+
     setLineEntry(prev => ({
       ...prev,
       stockCode: code,
-      vat: stock ? stock.salesVat : null,
-      price: stock ? (stock.salesPrices?.[0] || 0) : 0
+      vat: currentVat,
+      price: currentPrice
     }));
   };
 

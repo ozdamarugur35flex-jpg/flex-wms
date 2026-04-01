@@ -250,8 +250,8 @@ const mapStockData = (item: any) => {
   if (!item) return item;
   return {
     id: item.id || item.Id || item.code || item.Code || Math.random().toString(36).substr(2, 9),
-    code: item.code || item.Code || '',
-    name: item.name || item.Name || '',
+    code: item.code || item.Code || item.STOK_KODU || item.Stok_Kodu || '',
+    name: item.name || item.Name || item.STOK_ADI || item.Stok_Adi || '',
     englishName: item.englishName || item.EnglishName || '',
     unit1: item.unit1 || item.Unit1 || 'ADET',
     quantity: Number(item.quantity ?? item.Quantity ?? 0),
@@ -261,8 +261,8 @@ const mapStockData = (item: any) => {
     isLocked: !!(item.isLocked ?? item.IsLocked ?? false),
     isAutoConsumption: !!(item.isAutoConsumption ?? item.IsAutoConsumption ?? false),
     groupCode: item.groupCode || item.GroupCode || '',
-    purchaseVat: (item.purchaseVat ?? item.PurchaseVat ?? item.KDV_ORANI ?? item.Kdv_Orani ?? item.kdv_orani) !== undefined ? Number(item.purchaseVat ?? item.PurchaseVat ?? item.KDV_ORANI ?? item.Kdv_Orani ?? item.kdv_orani) : null,
-    salesVat: (item.salesVat ?? item.SalesVat ?? item.KDV_ORANI ?? item.Kdv_Orani ?? item.kdv_orani) !== undefined ? Number(item.salesVat ?? item.SalesVat ?? item.KDV_ORANI ?? item.Kdv_Orani ?? item.kdv_orani) : null,
+    purchaseVat: (item.purchaseVat ?? item.PurchaseVat ?? item.KDV_ORANI ?? item.Kdv_Orani ?? item.kdv_orani ?? item.KdvOrani ?? item.kdvOrani) !== undefined ? Number(item.purchaseVat ?? item.PurchaseVat ?? item.KDV_ORANI ?? item.Kdv_Orani ?? item.kdv_orani ?? item.KdvOrani ?? item.kdvOrani) : null,
+    salesVat: (item.salesVat ?? item.SalesVat ?? item.KDV_ORANI ?? item.Kdv_Orani ?? item.kdv_orani ?? item.KdvOrani ?? item.kdvOrani) !== undefined ? Number(item.salesVat ?? item.SalesVat ?? item.KDV_ORANI ?? item.Kdv_Orani ?? item.kdv_orani ?? item.KdvOrani ?? item.kdvOrani) : null,
     salesPrices: [
       Number(item.salesPrice1 ?? item.SalesPrice1 ?? item.SATIS_FIAT1 ?? item.Satis_Fiat1 ?? item.SATIS_FIYAT1 ?? item.satis_fiyat1 ?? 0),
       Number(item.salesPrice2 ?? item.SalesPrice2 ?? item.SATIS_FIAT2 ?? item.Satis_Fiat2 ?? item.SATIS_FIYAT2 ?? item.satis_fiyat2 ?? 0),
