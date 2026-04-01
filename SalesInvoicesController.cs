@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using System.Dynamic;
 
 namespace tuckapi.Controllers
 {
@@ -24,11 +25,11 @@ namespace tuckapi.Controllers
                     SELECT 
                         F.FATIRS_NO as InvoiceNo,
                         F.CARI_KODU as CustomerCode,
-                        dbo.TRK(C.CARI_ISIM) as CustomerName,
+                        dbo.TRK(ISNULL(C.CARI_ISIM, '')) as CustomerName,
                         F.TARIH as Date,
                         F.GENELTOPLAM as TotalAmount,
                         F.GIB_FATIRS_NO as GibInvoiceNo,
-                        dbo.TRK(F.ACIKLAMA) as Description
+                        dbo.TRK(ISNULL(F.ACIKLAMA, '')) as Description
                     FROM TBLFATUIRS F
                     LEFT JOIN TBLCASABIT C ON C.CARI_KOD = F.CARI_KODU
                     WHERE F.FTIRSIP = '3'
@@ -52,9 +53,9 @@ namespace tuckapi.Controllers
                 var headerSql = @"
                     SELECT 
                         F.FATIRS_NO as InvoiceNo, F.TARIH as Date, F.CARI_KODU as CustomerCode,
-                        dbo.TRK(C.CARI_ISIM) as CustomerName, F.PROJE_KODU as ProjectCode, 
-                        dbo.TRK(F.ACIKLAMA) as Description, C.VERGI_DAIRESI as TaxOffice,
-                        C.VERGI_NUMARASI as TaxNumber, dbo.TRK(C.ADRES) as Address
+                        dbo.TRK(ISNULL(C.CARI_ISIM, '')) as CustomerName, F.PROJE_KODU as ProjectCode, 
+                        dbo.TRK(ISNULL(F.ACIKLAMA, '')) as Description, C.VERGI_DAIRESI as TaxOffice,
+                        C.VERGI_NUMARASI as TaxNumber, dbo.TRK(ISNULL(C.ADRES, '')) as Address
                     FROM TBLFATUIRS F
                     LEFT JOIN TBLCASABIT C ON C.CARI_KOD = F.CARI_KODU
                     WHERE F.FATIRS_NO = @invoiceNo AND F.FTIRSIP = '3'";
@@ -62,10 +63,17 @@ namespace tuckapi.Controllers
                 var header = await conn.QueryFirstOrDefaultAsync<dynamic>(headerSql, new { invoiceNo });
                 if (header == null) return NotFound(new { message = "İrsaliye bulunamadı." });
 
+                // Convert to ExpandoObject to add properties
+                var headerDict = (IDictionary<string, object>)new ExpandoObject();
+                foreach (var prop in (IDictionary<string, object>)header)
+                {
+                    headerDict[prop.Key] = prop.Value;
+                }
+
                 var linesSql = @"
                     SELECT 
                         S.STOK_KODU as StockCode, 
-                        dbo.TRK(SB.STOK_ADI) as StockName,
+                        dbo.TRK(ISNULL(SB.STOK_ADI, '')) as StockName,
                         S.STHAR_GCMIK as Quantity, S.STHAR_NF as Price, S.STHAR_KDV as Vat,
                         (S.STHAR_GCMIK * S.STHAR_NF) as Total,
                         S.DEPO_KODU as WarehouseCode
@@ -75,9 +83,9 @@ namespace tuckapi.Controllers
                     ORDER BY S.SIRA";
 
                 var items = await conn.QueryAsync(linesSql, new { invoiceNo });
-                header.Items = items;
+                headerDict["Items"] = items;
 
-                return Ok(header);
+                return Ok(headerDict);
             }
             catch (Exception ex)
             {
@@ -106,7 +114,15 @@ namespace tuckapi.Controllers
                     else if (request.ProjectCode.StartsWith("1")) stharKod1 = "M";
                 }
 
-                DateTime docDate = string.IsNullOrEmpty(request.Date) ? DateTime.Now : DateTime.Parse(request.Date);
+                DateTime docDate;
+                if (string.IsNullOrEmpty(request.Date))
+                {
+                    docDate = DateTime.Now;
+                }
+                else if (!DateTime.TryParse(request.Date, out docDate))
+                {
+                    docDate = DateTime.Now;
+                }
                 string cleanNo = new string((request.InvoiceNo ?? "").Replace("EIR", "").Where(char.IsDigit).ToArray());
                 string finalInvoiceNo = "EIR" + cleanNo.PadLeft(12, '0'); // 3 + 12 = 15
                 if (finalInvoiceNo.Length > 15) finalInvoiceNo = finalInvoiceNo.Substring(0, 15);

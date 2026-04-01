@@ -208,7 +208,7 @@ const mapSalesInvoiceData = (item: any) => {
       quantity: Number(line.quantity ?? line.Quantity ?? 0),
       unit: line.unit || line.Unit || 'ADET',
       price: Number(line.price ?? line.Price ?? 0),
-      vat: Number(line.vat ?? line.Vat ?? 20),
+      vat: (line.vat ?? line.Vat) !== undefined ? Number(line.vat ?? line.Vat) : null,
       total: Number(line.total ?? line.Total ?? 0),
       warehouseCode: line.warehouseCode || line.WarehouseCode || '01',
     })) : []
@@ -261,8 +261,14 @@ const mapStockData = (item: any) => {
     isLocked: !!(item.isLocked ?? item.IsLocked ?? false),
     isAutoConsumption: !!(item.isAutoConsumption ?? item.IsAutoConsumption ?? false),
     groupCode: item.groupCode || item.GroupCode || '',
-    purchaseVat: (item.purchaseVat ?? item.PurchaseVat ?? item.KDV_ORANI ?? item.Kdv_Orani ?? item.kdv_orani ?? item.KdvOrani ?? item.kdvOrani) !== undefined ? Number(item.purchaseVat ?? item.PurchaseVat ?? item.KDV_ORANI ?? item.Kdv_Orani ?? item.kdv_orani ?? item.KdvOrani ?? item.kdvOrani) : null,
-    salesVat: (item.salesVat ?? item.SalesVat ?? item.KDV_ORANI ?? item.Kdv_Orani ?? item.kdv_orani ?? item.KdvOrani ?? item.kdvOrani) !== undefined ? Number(item.salesVat ?? item.SalesVat ?? item.KDV_ORANI ?? item.Kdv_Orani ?? item.kdv_orani ?? item.KdvOrani ?? item.kdvOrani) : null,
+    purchaseVat: (() => {
+      const v = item.purchaseVat ?? item.PurchaseVat ?? item.KDV_ORANI ?? item.Kdv_Orani ?? item.kdv_orani ?? item.KdvOrani ?? item.kdvOrani;
+      return (v === null || v === undefined) ? null : Number(v);
+    })(),
+    salesVat: (() => {
+      const v = item.salesVat ?? item.SalesVat ?? item.KDV_ORANI ?? item.Kdv_Orani ?? item.kdv_orani ?? item.KdvOrani ?? item.kdvOrani;
+      return (v === null || v === undefined) ? null : Number(v);
+    })(),
     salesPrices: [
       Number(item.salesPrice1 ?? item.SalesPrice1 ?? item.SATIS_FIAT1 ?? item.Satis_Fiat1 ?? item.SATIS_FIYAT1 ?? item.satis_fiyat1 ?? 0),
       Number(item.salesPrice2 ?? item.SalesPrice2 ?? item.SATIS_FIAT2 ?? item.Satis_Fiat2 ?? item.SATIS_FIYAT2 ?? item.satis_fiyat2 ?? 0),

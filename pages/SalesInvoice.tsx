@@ -1119,7 +1119,7 @@ const SalesInvoicePage: React.FC = () => {
                              <td className="px-6 py-4 text-center font-black text-slate-700">{item.quantity.toLocaleString()}</td>
                              <td className="px-6 py-4 text-center font-bold text-slate-500">₺{item.price.toFixed(2)}</td>
                              <td className="px-6 py-4 text-right">
-                                <p className="text-xs font-black text-indigo-600">%{item.vat}</p>
+                                <p className="text-xs font-black text-indigo-600">{item.vat !== null ? `%${item.vat}` : 'TANIMLANMAMIŞ'}</p>
                              </td>
                              <td className="px-6 py-4 text-right">
                                 <p className="text-sm font-black text-indigo-700">₺{item.total.toLocaleString(undefined, {minimumFractionDigits: 2})}</p>
