@@ -97,7 +97,7 @@ const SalesInvoicePage: React.FC = () => {
     warehouse: '01',
     qty: 0,
     price: 0,
-    vat: 20
+    vat: null as number | null
   });
 
   useEffect(() => {
@@ -210,13 +210,18 @@ const SalesInvoicePage: React.FC = () => {
     setLineEntry(prev => ({
       ...prev,
       stockCode: code,
-      vat: stock ? stock.salesVat : 20,
+      vat: stock ? stock.salesVat : null,
       price: stock ? (stock.salesPrices?.[0] || 0) : 0
     }));
   };
 
   const handleAddLine = () => {
     if (!lineEntry.stockCode || lineEntry.qty <= 0) return;
+
+    if (lineEntry.vat === null) {
+      alert('KDV oranı tanımlanmamış. Lütfen stok kartını kontrol edin.');
+      return;
+    }
     
     const stock = stocks.find(s => s.code === lineEntry.stockCode);
     const newItem: InvoiceItem = {
@@ -242,7 +247,7 @@ const SalesInvoicePage: React.FC = () => {
       warehouse: '01',
       qty: 0,
       price: 0,
-      vat: 20
+      vat: null
     });
   };
 
@@ -1055,7 +1060,9 @@ const SalesInvoicePage: React.FC = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-6 border-t border-white/10 relative z-10">
                  <div className="flex items-center gap-4 bg-white/5 rounded-2xl px-6 py-4 border border-white/5">
                     <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">KDV ORANI (KART)</span>
-                    <span className="text-lg font-black text-indigo-400">%{lineEntry.vat}</span>
+                    <span className={`text-lg font-black ${lineEntry.vat === null ? 'text-rose-400' : 'text-indigo-400'}`}>
+                      {lineEntry.vat !== null ? `%${lineEntry.vat}` : 'TANIMLANMAMIŞ'}
+                    </span>
                  </div>
                  <div className="flex items-center gap-4 bg-white/5 rounded-2xl px-6 py-4 border border-white/5">
                     <ShieldCheck size={16} className="text-slate-500" />
