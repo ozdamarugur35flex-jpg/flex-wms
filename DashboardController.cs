@@ -26,12 +26,12 @@ namespace tuckapi.Controllers
 
                 // 2. Bekleyen Sevk Emri Sayısı
                 var pendingShipments = await conn.ExecuteScalarAsync<int>(@"
-                    SELECT COUNT(*) FROM TBLFATUIRS WITH(NOLOCK) WHERE FTIRSIP = '3' AND (GIB_FATIRS_NO IS NULL OR GIB_FATIRS_NO = '')");
+                    SELECT COUNT(*) FROM TBLFATUIRS WITH(NOLOCK) WHERE FTIRSIP IN ('1', '3') AND (GIB_FATIRS_NO IS NULL OR GIB_FATIRS_NO = '')");
 
                 // 3. Bugünün Satışları
                 var todaySales = await conn.ExecuteScalarAsync<decimal>(@"
                     SELECT ISNULL(SUM(GENELTOPLAM), 0) FROM TBLFATUIRS WITH(NOLOCK) 
-                    WHERE FTIRSIP = '3' AND CONVERT(DATE, TARIH) = CONVERT(DATE, GETDATE())");
+                    WHERE FTIRSIP IN ('1', '3') AND CONVERT(DATE, TARIH) = CONVERT(DATE, GETDATE())");
 
                 return Ok(new
                 {
@@ -57,7 +57,7 @@ namespace tuckapi.Controllers
                         FORMAT(TARIH, 'dd.MM') as label,
                         SUM(GENELTOPLAM) as value
                     FROM TBLFATUIRS WITH(NOLOCK)
-                    WHERE FTIRSIP = '3'
+                    WHERE FTIRSIP IN ('1', '3')
                     GROUP BY TARIH
                     ORDER BY TARIH DESC");
 

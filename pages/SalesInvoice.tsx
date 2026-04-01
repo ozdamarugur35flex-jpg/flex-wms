@@ -41,6 +41,7 @@ const SalesInvoicePage: React.FC = () => {
   const [history, setHistory] = useState<any[]>([]);
   const [isHistoryLoading, setIsHistoryLoading] = useState(false);
   const [isPreviewMode, setIsPreviewMode] = useState(false);
+  const [officialHtml, setOfficialHtml] = useState<string | null>(null);
   const [eWaybillDetails, setEWaybillDetails] = useState<any>(null);
   const [items, setItems] = useState<InvoiceItem[]>([]);
   const [stocks, setStocks] = useState<StockCard[]>([]);
@@ -328,12 +329,27 @@ const SalesInvoicePage: React.FC = () => {
 
   const handlePreview = async () => {
     if (invoiceHeader.invoiceNo) {
+      setIsLoading(true);
       try {
-        const details = await apiService.salesInvoices.getEWaybillDetails(invoiceHeader.invoiceNo);
-        setEWaybillDetails(details);
+        // 1. Resmi E-İrsaliye Taslağını Oluştur ve HTML içeriğini al
+        const result = await apiService.salesInvoices.generateEWaybillDraft(invoiceHeader.invoiceNo);
+        
+        if (result && result.success && result.html) {
+          setOfficialHtml(result.html);
+          if (result.gibNo) {
+            setInvoiceHeader(prev => ({ ...prev, gibInvoiceNo: result.gibNo }));
+          }
+        } else {
+          // Eğer resmi taslak oluşturulamazsa eski usul detayları getir
+          const details = await apiService.salesInvoices.getEWaybillDetails(invoiceHeader.invoiceNo);
+          setEWaybillDetails(details);
+          setOfficialHtml(null);
+        }
       } catch (error) {
-        console.error("E-İrsaliye detayları alınamadı", error);
-        setEWaybillDetails(null);
+        console.error("E-İrsaliye önizleme hatası", error);
+        setOfficialHtml(null);
+      } finally {
+        setIsLoading(false);
       }
     }
     setIsPreviewMode(true);
@@ -383,7 +399,10 @@ const SalesInvoicePage: React.FC = () => {
       <div className="min-h-screen bg-slate-200 p-8 flex flex-col items-center gap-6 animate-in fade-in duration-500 overflow-y-auto">
         <div className="w-full max-w-[210mm] flex justify-between items-center mb-4 px-4 print:hidden">
            <button 
-             onClick={() => setIsPreviewMode(false)}
+             onClick={() => {
+               setIsPreviewMode(false);
+               setOfficialHtml(null);
+             }}
              className="flex items-center gap-2 px-4 py-2 bg-white rounded-xl text-xs font-black shadow-sm text-slate-600 hover:text-indigo-600"
            >
               <XCircle size={16} /> GİRİŞ EKRANINA DÖN
@@ -395,71 +414,78 @@ const SalesInvoicePage: React.FC = () => {
               <Printer size={16} /> YAZDIR
            </button>
         </div>
-        {/* ... existing preview layout ... */}
-        <div className="bg-white w-[210mm] min-h-[297mm] shadow-2xl p-[10mm] text-slate-900 print:shadow-none print:m-0" style={{ fontFamily: '"Courier New", Courier, monospace' }}>
-           <div className="relative h-[100mm] border-b border-slate-100 border-dashed">
-              <div className="absolute top-[20mm] left-[5mm] text-lg font-bold">SATIŞ İRSALİYESİ</div>
-              <div className="absolute top-[45mm] left-[5mm] max-w-[100mm] text-sm leading-relaxed">
-                 <p className="font-bold mb-1">{invoiceHeader.customerName}</p>
-                 <p className="text-xs">{invoiceHeader.address}</p>
-              </div>
-              <div className="absolute top-[65mm] left-[5mm] text-xs space-y-1">
-                 <p>Vergi Dairesi: {invoiceHeader.taxOffice}</p>
-                 <p>Vergi Numarası: {invoiceHeader.taxNumber}</p>
-                 <p>Proje Kodu: {invoiceHeader.projectCode}</p>
-              </div>
-              <div className="absolute top-[55mm] right-[5mm] text-xs text-right space-y-2">
-                 <p><span className="font-bold">Düzenleme Tarihi:</span> {invoiceHeader.date}</p>
-                 <p><span className="font-bold">Fiili Sevk Tarihi:</span> {invoiceHeader.deliveryDate}</p>
-                 <p className="mt-4"><span className="font-bold">İrsaliye No:</span> {invoiceHeader.invoiceNo}</p>
-              </div>
-           </div>
-           <div className="mt-4">
-              <table className="w-full text-xs">
-                <thead>
-                  <tr className="border-b-2 border-slate-900 h-10">
-                    <th className="text-left w-24">Stok Kodu</th>
-                    <th className="text-left">Ürün İsmi</th>
-                    <th className="text-right w-24">Miktar</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {items.map((item, idx) => (
-                    <tr key={idx} className="h-8 align-middle">
-                      <td className="text-left font-bold">{item.stockCode}</td>
-                      <td className="text-left uppercase">{item.stockName}</td>
-                      <td className="text-right font-bold">{item.quantity.toLocaleString()}</td>
+
+        {officialHtml ? (
+          <div 
+            className="bg-white w-[210mm] min-h-[297mm] shadow-2xl p-4 print:shadow-none print:m-0 overflow-hidden"
+            dangerouslySetInnerHTML={{ __html: officialHtml }}
+          />
+        ) : (
+          <div className="bg-white w-[210mm] min-h-[297mm] shadow-2xl p-[10mm] text-slate-900 print:shadow-none print:m-0" style={{ fontFamily: '"Courier New", Courier, monospace' }}>
+             <div className="relative h-[100mm] border-b border-slate-100 border-dashed">
+                <div className="absolute top-[20mm] left-[5mm] text-lg font-bold">SATIŞ İRSALİYESİ</div>
+                <div className="absolute top-[45mm] left-[5mm] max-w-[100mm] text-sm leading-relaxed">
+                   <p className="font-bold mb-1">{invoiceHeader.customerName}</p>
+                   <p className="text-xs">{invoiceHeader.address}</p>
+                </div>
+                <div className="absolute top-[65mm] left-[5mm] text-xs space-y-1">
+                   <p>Vergi Dairesi: {invoiceHeader.taxOffice}</p>
+                   <p>Vergi Numarası: {invoiceHeader.taxNumber}</p>
+                   <p>Proje Kodu: {invoiceHeader.projectCode}</p>
+                </div>
+                <div className="absolute top-[55mm] right-[5mm] text-xs text-right space-y-2">
+                   <p><span className="font-bold">Düzenleme Tarihi:</span> {invoiceHeader.date}</p>
+                   <p><span className="font-bold">Fiili Sevk Tarihi:</span> {invoiceHeader.deliveryDate}</p>
+                   <p className="mt-4"><span className="font-bold">İrsaliye No:</span> {invoiceHeader.invoiceNo}</p>
+                </div>
+             </div>
+             <div className="mt-4">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="border-b-2 border-slate-900 h-10">
+                      <th className="text-left w-24">Stok Kodu</th>
+                      <th className="text-left">Ürün İsmi</th>
+                      <th className="text-right w-24">Miktar</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-           </div>
-           <div className="mt-12 border-t pt-4">
-              <div className="text-xs leading-relaxed italic mb-4">
-                 <p><span className="font-bold">Açıklama:</span> {invoiceHeader.description}</p>
-              </div>
-              
-              {eWaybillDetails && (
-                <div className="mt-8 border-t border-slate-200 pt-4 text-xs">
-                  <h3 className="font-bold text-sm mb-2 uppercase">E-İrsaliye / Taşıyıcı Bilgileri</h3>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <p><span className="font-bold">GİB İrsaliye No:</span> {eWaybillDetails.gibInvoiceNo}</p>
-                      <p><span className="font-bold">Taşıyıcı Firma:</span> {eWaybillDetails.carrierName}</p>
-                      <p><span className="font-bold">Taşıyıcı VKN:</span> {eWaybillDetails.carrierVkn}</p>
-                      <p><span className="font-bold">İl / İlçe:</span> {eWaybillDetails.carrierCity} / {eWaybillDetails.carrierSubCity}</p>
-                      <p><span className="font-bold">Posta Kodu:</span> {eWaybillDetails.carrierPostal}</p>
-                    </div>
-                    <div>
-                      <p><span className="font-bold">Araç Plaka:</span> {eWaybillDetails.licensePlateId}</p>
-                      <p><span className="font-bold">Şoför Adı Soyadı:</span> {eWaybillDetails.driverFirstName} {eWaybillDetails.driverLastName}</p>
-                      <p><span className="font-bold">Şoför TCKN:</span> {eWaybillDetails.driverNid}</p>
+                  </thead>
+                  <tbody>
+                    {items.map((item, idx) => (
+                      <tr key={idx} className="h-8 align-middle">
+                        <td className="text-left font-bold">{item.stockCode}</td>
+                        <td className="text-left uppercase">{item.stockName}</td>
+                        <td className="text-right font-bold">{item.quantity.toLocaleString()}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+             </div>
+             <div className="mt-12 border-t pt-4">
+                <div className="text-xs leading-relaxed italic mb-4">
+                   <p><span className="font-bold">Açıklama:</span> {invoiceHeader.description}</p>
+                </div>
+                
+                {eWaybillDetails && (
+                  <div className="mt-8 border-t border-slate-200 pt-4 text-xs">
+                    <h3 className="font-bold text-sm mb-2 uppercase">E-İrsaliye / Taşıyıcı Bilgileri</h3>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <p><span className="font-bold">GİB İrsaliye No:</span> {eWaybillDetails.gibInvoiceNo}</p>
+                        <p><span className="font-bold">Taşıyıcı Firma:</span> {eWaybillDetails.carrierName}</p>
+                        <p><span className="font-bold">Taşıyıcı VKN:</span> {eWaybillDetails.carrierVkn}</p>
+                        <p><span className="font-bold">İl / İlçe:</span> {eWaybillDetails.carrierCity} / {eWaybillDetails.carrierSubCity}</p>
+                        <p><span className="font-bold">Posta Kodu:</span> {eWaybillDetails.carrierPostal}</p>
+                      </div>
+                      <div>
+                        <p><span className="font-bold">Araç Plaka:</span> {eWaybillDetails.licensePlateId}</p>
+                        <p><span className="font-bold">Şoför Adı Soyadı:</span> {eWaybillDetails.driverFirstName} {eWaybillDetails.driverLastName}</p>
+                        <p><span className="font-bold">Şoför TCKN:</span> {eWaybillDetails.driverNid}</p>
+                      </div>
                     </div>
                   </div>
-                </div>
-              )}
-           </div>
-        </div>
+                )}
+             </div>
+          </div>
+        )}
       </div>
     );
   }

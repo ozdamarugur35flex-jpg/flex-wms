@@ -419,6 +419,9 @@ export const apiService = {
     getAll: () => request(`${API_BASE_URL}/salesinvoices`, undefined, [], mapSalesInvoiceData),
     getDetail: (invoiceNo: string) => request(`${API_BASE_URL}/salesinvoices/${invoiceNo}`, undefined, null, mapSalesInvoiceData),
     getEWaybillDetails: (invoiceNo: string) => request(`${API_BASE_URL}/salesinvoices/${invoiceNo}/ewaybill`, undefined, null),
+    generateEWaybillDraft: (invoiceNo: string) => request(`${API_BASE_URL}/salesinvoices/${invoiceNo}/generate-ewaybill-draft`, {
+      method: 'POST'
+    }, { success: false }),
     save: (data: any) => request(`${API_BASE_URL}/salesinvoices`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

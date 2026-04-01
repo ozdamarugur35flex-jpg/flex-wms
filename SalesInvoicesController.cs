@@ -6,6 +6,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Dynamic;
+using System.Runtime.InteropServices;
+using NetOpenX50;
+using System.IO;
 
 namespace tuckapi.Controllers
 {
@@ -23,7 +26,7 @@ namespace tuckapi.Controllers
                 using var conn = new SqlConnection(_connStr);
                 string sql = @"
                     SELECT 
-                        F.FATIRS_NO as InvoiceNo,
+                        RTRIM(F.FATIRS_NO) as InvoiceNo,
                         F.CARI_KODU as CustomerCode,
                         ISNULL(C.CARI_ISIM, '') as CustomerName,
                         F.TARIH as Date,
@@ -32,7 +35,7 @@ namespace tuckapi.Controllers
                         ISNULL(F.ACIKLAMA, '') as Description
                     FROM TBLFATUIRS F
                     LEFT JOIN TBLCASABIT C ON C.CARI_KOD = F.CARI_KODU
-                    WHERE F.FTIRSIP = '3'
+                    WHERE F.FTIRSIP IN ('1', '3')
                     ORDER BY F.TARIH DESC";
 
                 var invoices = await conn.QueryAsync(sql);
@@ -44,6 +47,88 @@ namespace tuckapi.Controllers
             }
         }
 
+        [HttpGet("debug-columns")]
+        public async Task<IActionResult> DebugColumns()
+        {
+            try
+            {
+                using var conn = new SqlConnection(_connStr);
+                string sqlC = "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'TBLCASABIT'";
+                var columnsC = await conn.QueryAsync<string>(sqlC);
+                
+                string sqlF = "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'TBLFATUIRS'";
+                var columnsF = await conn.QueryAsync<string>(sqlF);
+                
+                return Ok(new { TBLCASABIT = columnsC, TBLFATUIRS = columnsF });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
+        [HttpPost("{invoiceNo}/generate-ewaybill-draft")]
+        public IActionResult GenerateEWaybillDraft(string invoiceNo)
+        {
+            dynamic kernel = new Kernel();
+            dynamic sirket = null;
+            dynamic eBelge = null;
+
+            try
+            {
+                sirket = kernel.yeniSirket(TVTTipi.vtMSSQL, "MERACK26", "TEMELSET_USER", "TEMELSET_PASS", "NET_USER", "NET_PASS", 0);
+                eBelge = kernel.yeniEBelge(sirket, TEBelgeTip.ebtEIrs);
+
+                // 1. E-İrsaliye Kaydı Oluştur (Taslak olarak Netsis'e kaydeder)
+                try 
+                { 
+                    eBelge.EIrsaliyeOlustur(invoiceNo); 
+                } 
+                catch (Exception ex) 
+                {
+                    Console.WriteLine("E-İrsaliye oluşturma uyarısı/hatası: " + ex.Message);
+                }
+
+                // 2. E-İrsaliye Görüntüleme (HTML dosyasını oluşturur)
+                string tempPath = Path.Combine(Path.GetTempPath(), "NetsisEWaybill");
+                if (!Directory.Exists(tempPath)) Directory.CreateDirectory(tempPath);
+
+                string gibNo = "";
+                using (var conn = new SqlConnection(_connStr))
+                {
+                    gibNo = conn.QueryFirstOrDefault<string>("SELECT GIB_FATIRS_NO FROM TBLFATUIRS WHERE FATIRS_NO = @invoiceNo AND FTIRSIP = '3'", new { invoiceNo });
+                }
+
+                if (string.IsNullOrEmpty(gibNo)) gibNo = invoiceNo;
+
+                string htmlFilePath = eBelge.EBelgeGoruntuleme(gibNo, tempPath, TEBelgeBoxType.ebOutbox, "");
+
+                if (System.IO.File.Exists(htmlFilePath))
+                {
+                    string htmlContent = System.IO.File.ReadAllText(htmlFilePath);
+                    return Ok(new { success = true, html = htmlContent, gibNo = gibNo });
+                }
+
+                return BadRequest(new { success = false, message = "Görüntüleme dosyası oluşturulamadı." });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { success = false, message = "NetOpenX Hatası: " + ex.Message });
+            }
+            finally
+            {
+                if (eBelge != null) Marshal.ReleaseComObject(eBelge);
+                if (sirket != null) Marshal.ReleaseComObject(sirket);
+                if (kernel != null)
+                {
+                    try { kernel.serbestBirak(); } catch { }
+                    Marshal.ReleaseComObject(kernel);
+                }
+                GC.Collect();
+                GC.WaitForPendingFinalizers();
+            }
+        }
+
         [HttpGet("{invoiceNo}")]
         public async Task<IActionResult> GetDetail(string invoiceNo)
         {
@@ -52,24 +137,34 @@ namespace tuckapi.Controllers
                 using var conn = new SqlConnection(_connStr);
                 var headerSql = @"
                     SELECT 
-                        F.FATIRS_NO as InvoiceNo, F.TARIH as Date, F.CARI_KODU as CustomerCode,
+                        RTRIM(F.FATIRS_NO) as InvoiceNo, F.TARIH as Date, F.CARI_KODU as CustomerCode,
                         ISNULL(C.CARI_ISIM, '') as CustomerName, F.PROJE_KODU as ProjectCode, 
-                        ISNULL(F.ACIKLAMA, '') as Description, C.VERGI_DAIRESI as TaxOffice,
-                        C.VERGI_NUMARASI as TaxNumber, ISNULL(C.ADRES, '') as Address,
-                        F.GIB_FATIRS_NO as GibInvoiceNo
+                        ISNULL(F.ACIKLAMA, '') as Description,
+                        F.GIB_FATIRS_NO as GibInvoiceNo,
+                        C.*
                     FROM TBLFATUIRS F
                     LEFT JOIN TBLCASABIT C ON C.CARI_KOD = F.CARI_KODU
-                    WHERE F.FATIRS_NO = @invoiceNo AND F.FTIRSIP = '3'";
+                    WHERE RTRIM(F.FATIRS_NO) = RTRIM(@invoiceNo) AND F.FTIRSIP IN ('1', '3')";
 
                 var header = await conn.QueryFirstOrDefaultAsync<dynamic>(headerSql, new { invoiceNo });
                 if (header == null) return NotFound(new { message = "İrsaliye bulunamadı." });
 
-                // Convert to ExpandoObject to add properties
+                // Convert to ExpandoObject to add properties and safely extract fields
                 var headerDict = (IDictionary<string, object>)new ExpandoObject();
-                foreach (var prop in (IDictionary<string, object>)header)
+                var rawHeader = (IDictionary<string, object>)header;
+                
+                foreach (var prop in rawHeader)
                 {
                     headerDict[prop.Key] = prop.Value;
                 }
+
+                // Safely map address and tax info
+                headerDict["TaxOffice"] = rawHeader.ContainsKey("VERGI_DAIRESI") ? rawHeader["VERGI_DAIRESI"] : "";
+                headerDict["TaxNumber"] = rawHeader.ContainsKey("VERGI_NUMARASI") ? rawHeader["VERGI_NUMARASI"] : 
+                                         (rawHeader.ContainsKey("VERGI_NUMARA") ? rawHeader["VERGI_NUMARA"] : "");
+                headerDict["Address"] = rawHeader.ContainsKey("ADRES") ? rawHeader["ADRES"] : 
+                                       (rawHeader.ContainsKey("ADRES1") ? rawHeader["ADRES1"] : 
+                                       (rawHeader.ContainsKey("CARI_ADRES") ? rawHeader["CARI_ADRES"] : ""));
 
                 var linesSql = @"
                     SELECT 
@@ -80,7 +175,7 @@ namespace tuckapi.Controllers
                         S.DEPO_KODU as WarehouseCode
                     FROM TBLSTHAR S
                     LEFT JOIN TBLSTSABIT SB ON SB.STOK_KODU = S.STOK_KODU
-                    WHERE S.FISNO = @invoiceNo AND S.STHAR_FTIRSIP = '3'
+                    WHERE RTRIM(S.FISNO) = RTRIM(@invoiceNo) AND S.STHAR_FTIRSIP IN ('1', '3')
                     ORDER BY S.SIRA";
 
                 var items = await conn.QueryAsync(linesSql, new { invoiceNo });
@@ -108,7 +203,7 @@ namespace tuckapi.Controllers
                         'İSTANBUL' as CarrierCity,
                         'TUZLA' as CarrierSubCity
                     FROM TBLFATUIRS F
-                    WHERE F.FATIRS_NO = @invoiceNo AND F.FTIRSIP = '3'";
+                    WHERE RTRIM(F.FATIRS_NO) = RTRIM(@invoiceNo) AND F.FTIRSIP IN ('1', '3')";
 
                 var details = await conn.QueryFirstOrDefaultAsync<dynamic>(sql, new { invoiceNo });
                 if (details == null)
@@ -196,14 +291,14 @@ namespace tuckapi.Controllers
                         KOD1, KDV_DAHILMI, KAPATILMIS, C_YEDEK6, EBELGE,
                         ISLETME_KODU, KAYITTARIHI, KAYITYAPANKUL, GIB_FATIRS_NO, PROJE_KODU,
                         FATKALEM_ADEDI, ONAYTIPI, ONAYNUM, VADEBAZT,
-                        ODEMETARIHI, SIPARIS_TEST, KS_KODU, HALFAT, UPDATE_KODU
+                        ODEMETARIHI, SIPARIS_TEST, KS_KODU, HALFAT, UPDATE_KODU, FATURALASMAYACAK
                     ) VALUES (
                         0, '3', @InvoiceNo, @CustomerCode, @Date, 2, 
                         @BrutTutar, @GenelToplam, @KdvTutar, @Description, 
-                        @Kod1, 'H', 'S', 'X', 1,
+                        @Kod1, 'H', NULL, 'X', 1,
                         1, GETDATE(), 'FLEX_WMS', @GibInvoiceNo, @ProjectCode,
-                        @ItemCount, 'A', 0, @Date,
-                        @Date, @Date, '001', 0, 'F'
+                        @ItemCount, 'A', 0, NULL,
+                        NULL, @Date, '001', 0, 'F', 'H'
                     )";
 
                 await conn.ExecuteAsync(sqlHeader, new
@@ -248,7 +343,7 @@ namespace tuckapi.Controllers
                             '3', 'H', @Date, @Price, @Price,
                             100, 1, 0, @Sira,
                             'I', @StharKod1, @CustomerCode, 0,
-                            @VatRate, @Price, 0, 0, 
+                            @VatRate, 0, 0, 0, 
                             @CustomerCode, 'F', @Date,
                             @InvoiceNo, @Date, 0, @ProjectCode
                         )";
@@ -286,9 +381,9 @@ namespace tuckapi.Controllers
             using var transaction = conn.BeginTransaction();
             try
             {
-                await conn.ExecuteAsync("DELETE FROM TBLSTHAR WHERE FISNO = @invoiceNo AND STHAR_FTIRSIP = '3'", new { invoiceNo }, transaction);
-                await conn.ExecuteAsync("DELETE FROM TBLFATUEK WHERE FATIRSNO = @invoiceNo", new { invoiceNo }, transaction);
-                await conn.ExecuteAsync("DELETE FROM TBLFATUIRS WHERE FATIRS_NO = @invoiceNo AND FTIRSIP = '3'", new { invoiceNo }, transaction);
+                await conn.ExecuteAsync("DELETE FROM TBLSTHAR WHERE RTRIM(FISNO) = RTRIM(@invoiceNo) AND STHAR_FTIRSIP IN ('1', '3')", new { invoiceNo }, transaction);
+                await conn.ExecuteAsync("DELETE FROM TBLFATUEK WHERE RTRIM(FATIRSNO) = RTRIM(@invoiceNo) AND FKOD IN ('1', '3')", new { invoiceNo }, transaction);
+                await conn.ExecuteAsync("DELETE FROM TBLFATUIRS WHERE RTRIM(FATIRS_NO) = RTRIM(@invoiceNo) AND FTIRSIP IN ('1', '3')", new { invoiceNo }, transaction);
 
                 transaction.Commit();
                 return Ok(new { success = true, message = "Kayıtlar silindi." });
@@ -308,7 +403,7 @@ namespace tuckapi.Controllers
                 using var conn = new SqlConnection(_connStr);
                 string prefix = "EIR"; // Sadece EIR, yıl yok
                 
-                string sql = @"SELECT TOP 1 FATIRS_NO FROM TBLFATUIRS WITH(NOLOCK) WHERE FTIRSIP = '3' AND FATIRS_NO LIKE @prefix + '%' ORDER BY FATIRS_NO DESC";
+                string sql = @"SELECT TOP 1 RTRIM(FATIRS_NO) FROM TBLFATUIRS WITH(NOLOCK) WHERE FTIRSIP IN ('1', '3') AND FATIRS_NO LIKE @prefix + '%' ORDER BY FATIRS_NO DESC";
                 var lastNo = await conn.QueryFirstOrDefaultAsync<string>(sql, new { prefix });
 
                 if (string.IsNullOrEmpty(lastNo)) return Ok(new { nextNo = prefix + "000000000001" });
