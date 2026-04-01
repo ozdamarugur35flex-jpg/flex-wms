@@ -169,7 +169,8 @@ namespace tuckapi.Controllers
 
                 foreach (var item in request.Items)
                 {
-                    string stockInfoSql = "SELECT SATIS_FIAT1, KDV_ORANI FROM TBLSTSABIT WHERE STOK_KODU = @StockCode";
+                    // TBLSTSABIT sorgusuna WITH(NOLOCK) eklendi
+                    string stockInfoSql = "SELECT SATIS_FIAT1, KDV_ORANI FROM TBLSTSABIT WITH(NOLOCK) WHERE STOK_KODU = @StockCode";
                     var stockInfo = await conn.QueryFirstOrDefaultAsync(stockInfoSql, new { item.StockCode }, transaction);
 
                     // KDV ve Fiyat SADECE stok kartından (TBLSTSABIT) gelecek
@@ -187,7 +188,7 @@ namespace tuckapi.Controllers
 
                 decimal calculatedGenelToplam = calculatedBrut + calculatedKdv;
 
-                // A. TBLFATUIRS (BAŞLIK)
+                // A. TBLFATUIRS (BAŞLIK) - FTIRSIP = '3' (tırnak içinde) yapıldı
                 string sqlHeader = @"
                     INSERT INTO TBLFATUIRS (
                         SUBE_KODU, FTIRSIP, FATIRS_NO, CARI_KODU, TARIH, TIPI, 
@@ -197,7 +198,7 @@ namespace tuckapi.Controllers
                         FATKALEM_ADEDI, ONAYTIPI, ONAYNUM, VADEBAZT,
                         ODEMETARIHI, SIPARIS_TEST, KS_KODU, HALFAT, UPDATE_KODU
                     ) VALUES (
-                        0, 3, @InvoiceNo, @CustomerCode, @Date, 2, 
+                        0, '3', @InvoiceNo, @CustomerCode, @Date, 2, 
                         @BrutTutar, @GenelToplam, @KdvTutar, @Description, 
                         @Kod1, 'H', 'S', 'X', 1,
                         1, GETDATE(), 'FLEX_WMS', @GibInvoiceNo, @ProjectCode,
@@ -220,16 +221,16 @@ namespace tuckapi.Controllers
                     Kod1 = stharKod1
                 }, transaction);
 
-                // B. TBLFATUEK (EK BİLGİ)
+                // B. TBLFATUEK (EK BİLGİ) - FKOD = '3' (tırnak içinde) yapıldı
                 string sqlExtra = @"
                     INSERT INTO TBLFATUEK (
                         SUBE_KODU, FKOD, FATIRSNO, CKOD, SIRALAMATURU, LIMITALTITEVKIFAT
                     ) VALUES (
-                        0, 3, @InvoiceNo, @CustomerCode, 'G', 0
+                        0, '3', @InvoiceNo, @CustomerCode, 'G', 0
                     )";
                 await conn.ExecuteAsync(sqlExtra, new { InvoiceNo = finalInvoiceNo, request.CustomerCode }, transaction);
 
-                // C. TBLSTHAR (KALEMLER)
+                // C. TBLSTHAR (KALEMLER) - STHAR_FTIRSIP = '3' (tırnak içinde) yapıldı
                 short sira = 1;
                 foreach (var item in processedItems)
                 {
@@ -244,7 +245,7 @@ namespace tuckapi.Controllers
                             IRSALIYE_NO, IRSALIYE_TARIH, STHAR_SIP_TURU, PROJE_KODU
                         ) VALUES (
                             @InvoiceNo, @StockCode, @Quantity, 'C',
-                            3, 'H', @Date, @Price, @Price,
+                            '3', 'H', @Date, @Price, @Price,
                             100, 1, 0, @Sira,
                             'I', @StharKod1, @CustomerCode, 0,
                             @VatRate, @Price, 0, 0, 
@@ -305,26 +306,25 @@ namespace tuckapi.Controllers
             try
             {
                 using var conn = new SqlConnection(_connStr);
-                string year = DateTime.Now.Year.ToString();
-                string prefix = "EIR" + year; // EIR2024
+                string prefix = "EIR"; // Sadece EIR, yıl yok
                 
-                string sql = @"SELECT TOP 1 FATIRS_NO FROM TBLFATUIRS WHERE FTIRSIP = '3' AND FATIRS_NO LIKE @prefix + '%' ORDER BY FATIRS_NO DESC";
+                string sql = @"SELECT TOP 1 FATIRS_NO FROM TBLFATUIRS WITH(NOLOCK) WHERE FTIRSIP = '3' AND FATIRS_NO LIKE @prefix + '%' ORDER BY FATIRS_NO DESC";
                 var lastNo = await conn.QueryFirstOrDefaultAsync<string>(sql, new { prefix });
 
-                if (string.IsNullOrEmpty(lastNo)) return Ok(new { nextNo = prefix + "00000001" });
+                if (string.IsNullOrEmpty(lastNo)) return Ok(new { nextNo = prefix + "000000000001" });
 
                 string numberPart = lastNo.Replace(prefix, "");
                 if (long.TryParse(numberPart, out long currentNum))
                 {
-                    // 8 hane padding (EIR + 4 + 8 = 15)
-                    string nextNo = prefix + (currentNum + 1).ToString().PadLeft(8, '0');
+                    // 12 hane padding (EIR + 12 = 15)
+                    string nextNo = prefix + (currentNum + 1).ToString().PadLeft(12, '0');
                     return Ok(new { nextNo });
                 }
-                return Ok(new { nextNo = "" });
+                return Ok(new { nextNo = prefix + "000000000001" });
             }
             catch
             {
-                return Ok(new { nextNo = "" });
+                return Ok(new { nextNo = "EIR000000000001" });
             }
         }
     }

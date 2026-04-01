@@ -12,7 +12,6 @@ namespace FlexWms.Api.Controllers
     [Route("[controller]")]
     public class StocksController : ControllerBase
     {
-        // Bağlantı dizesini projenize göre buraya sabitleyebilir veya appsettings.json'dan çekebilirsiniz.
         private readonly string _connectionString = "Server=.\\TUCKDB;Database=MERACK26;User Id=sa;Password=Pn123@;TrustServerCertificate=True;";
 
         [HttpGet]
@@ -23,8 +22,7 @@ namespace FlexWms.Api.Controllers
             {
                 using (SqlConnection conn = new SqlConnection(_connectionString))
                 {
-                    // SQL çıktınızda TBLSTSABIT tablosu göründüğü için o şekilde güncellendi.
-                    // Verilerin sonundaki boşlukları temizlemek için Trim() ekledik.
+                    // KDV_ORANI ve SATIS_FIAT1 alanları eklendi, dbo.TRK kullanılmadı
                     string sql = "SELECT STOK_KODU, STOK_ADI, OLCU_BR1, GRUP_KODU, KDV_ORANI, SATIS_FIAT1 FROM TBLSTSABIT WITH(NOLOCK) ORDER BY STOK_KODU ASC";
 
                     SqlCommand cmd = new SqlCommand(sql, conn);
@@ -97,30 +95,22 @@ namespace FlexWms.Api.Controllers
             if (dto == null || string.IsNullOrEmpty(dto.Code))
                 return BadRequest("Stok kodu boş olamaz.");
 
-            // dynamic kullanarak COM nesnelerindeki sürüm farklılıklarını aşıyoruz
             dynamic kernel = new Kernel();
             dynamic sirket = null;
             dynamic stok = null;
 
             try
             {
-                // NOT: Veritabanı ve kullanıcı bilgilerini gerçek Netsis bilgilerinizle güncelleyin.
                 sirket = kernel.yeniSirket(TVTTipi.vtMSSQL, "MERACK26", "TEMELSET_USER", "TEMELSET_PASS", "NET_USER", "NET_PASS", 0);
                 stok = kernel.yeniStok(sirket);
 
-                // dynamic sayesinde Property isimleri versiyona göre (STOK_KODU / StokKodu) otomatik çözülür.
                 try { stok.STOK_KODU = dto.Code; } catch { stok.StokKodu = dto.Code; }
                 try { stok.STOK_ADI = dto.Name; } catch { stok.StokAdi = dto.Name; }
                 try { stok.GRUP_KODU = dto.GroupCode; } catch { stok.GrupKodu = dto.GroupCode; }
-
-                // WMS'den geldiğini anlamak için Kod_1 kullanımı
                 try { stok.KOD_1 = "FLEXWMS"; } catch { stok.Kod1 = "FLEXWMS"; }
-
-                // Zorunlu alanlar (Varsayılan değerler)
                 try { stok.OLCU_BR1 = "ADET"; } catch { stok.OlcuBr1 = "ADET"; }
                 try { stok.KDV_ORANI = 20; } catch { stok.KdvOrani = 20; }
 
-                // Netsis'e kaydet
                 stok.kayitYeni();
 
                 return Ok(new { success = true, message = $"{dto.Code} kodlu stok Netsis'e başarıyla kaydedildi." });
@@ -131,21 +121,18 @@ namespace FlexWms.Api.Controllers
             }
             finally
             {
-                // Bellek yönetimi: COM nesnelerini güvenli bir şekilde serbest bırakıyoruz
                 if (stok != null) Marshal.ReleaseComObject(stok);
                 if (sirket != null) Marshal.ReleaseComObject(sirket);
-
                 if (kernel != null)
                 {
                     try { kernel.serbestBirak(); } catch { }
                     Marshal.ReleaseComObject(kernel);
                 }
-
-                // Zorunlu çöp toplama (COM nesneleri için tavsiye edilir)
                 GC.Collect();
                 GC.WaitForPendingFinalizers();
             }
         }
+    }
     }
 
     public class StockCreateDto
