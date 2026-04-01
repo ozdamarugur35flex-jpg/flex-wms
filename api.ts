@@ -261,8 +261,13 @@ const mapStockData = (item: any) => {
     isLocked: !!(item.isLocked ?? item.IsLocked ?? false),
     isAutoConsumption: !!(item.isAutoConsumption ?? item.IsAutoConsumption ?? false),
     groupCode: item.groupCode || item.GroupCode || '',
-    purchaseVat: Number(item.purchaseVat ?? item.PurchaseVat ?? 20),
-    salesVat: Number(item.salesVat ?? item.SalesVat ?? 20),
+    purchaseVat: Number(item.purchaseVat ?? item.PurchaseVat ?? item.KDV_ORANI ?? item.kdv_orani ?? 20),
+    salesVat: Number(item.salesVat ?? item.SalesVat ?? item.KDV_ORANI ?? item.kdv_orani ?? 20),
+    salesPrices: [
+      Number(item.salesPrice1 ?? item.SalesPrice1 ?? item.SATIS_FIYAT1 ?? item.satis_fiyat1 ?? 0),
+      Number(item.salesPrice2 ?? item.SalesPrice2 ?? item.SATIS_FIYAT2 ?? item.satis_fiyat2 ?? 0),
+      Number(item.salesPrice3 ?? item.SalesPrice3 ?? item.SATIS_FIYAT3 ?? item.satis_fiyat3 ?? 0)
+    ],
     width: Number(item.width ?? item.Width ?? 0),
     height: Number(item.height ?? item.Height ?? 0),
     depth: Number(item.depth ?? item.Depth ?? 0),
