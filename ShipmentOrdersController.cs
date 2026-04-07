@@ -41,16 +41,16 @@ namespace tuckapi.Controllers
 
                 string sql = @"
                     SELECT 
-                        S.Id,
-                        S.Durum,
-                        S.SevkEmriNo,
-                        S.SiparisNo,
-                        S.SipInckeyNo,
-                        S.Miktar,
-                        S.Depo,
-                        S.StokKodu,
-                        ISNULL(ST.STOK_ADI, '') as StokAdi,
-                        ISNULL(C.CARI_ISIM, '') as CariIsim
+                        S.Id as id,
+                        S.Durum as durum,
+                        S.SevkEmriNo as sevkEmriNo,
+                        S.SiparisNo as siparisNo,
+                        S.SipInckeyNo as sipInckeyNo,
+                        S.Miktar as miktar,
+                        S.Depo as depo,
+                        S.StokKodu as stokKodu,
+                        ISNULL(ST.STOK_ADI, '') as stokAdi,
+                        ISNULL(C.CARI_ISIM, '') as cariIsim
                     FROM FLEX_WMS_SEVK_EMRI S
                     LEFT JOIN TBLSTSABIT ST ON ST.STOK_KODU = S.StokKodu
                     LEFT JOIN TBLCASABIT C ON C.CARI_KOD = S.CariKodu
@@ -74,10 +74,10 @@ namespace tuckapi.Controllers
                 using var conn = new SqlConnection(_connStr);
                 string sql = @"
                     SELECT DISTINCT
-                        RTRIM(M.FATIRS_NO) as OrderNo,
-                        M.CARI_KODU as CustomerCode,
-                        ISNULL(C.CARI_ISIM, '') as CustomerName,
-                        M.TARIH as Date
+                        RTRIM(M.FATIRS_NO) as orderNo,
+                        M.CARI_KODU as customerCode,
+                        ISNULL(C.CARI_ISIM, '') as customerName,
+                        M.TARIH as date
                     FROM TBLSIPAMAS M
                     LEFT JOIN TBLCASABIT C ON C.CARI_KOD = M.CARI_KODU
                     INNER JOIN TBLSIPATRA T ON T.FISNO = M.FATIRS_NO AND T.STHAR_FTIRSIP = '6'
@@ -102,14 +102,14 @@ namespace tuckapi.Controllers
                 using var conn = new SqlConnection(_connStr);
                 string sql = @"
                     SELECT 
-                        T.INCKEYNO as Id,
-                        T.STOK_KODU as StockCode,
-                        ISNULL(ST.STOK_ADI, '') as StockName,
-                        T.STHAR_GCMIK as OrderedQty,
-                        ISNULL(T.FIRMA_DOVTUT, 0) as ShippedQty,
-                        (T.STHAR_GCMIK - ISNULL(T.FIRMA_DOVTUT, 0)) as RemainingQty,
-                        ISNULL(ST.OLCU_BR1, 'ADET') as Unit,
-                        T.DEPO_KODU as WarehouseCode
+                        T.INCKEYNO as id,
+                        T.STOK_KODU as stockCode,
+                        ISNULL(ST.STOK_ADI, '') as stockName,
+                        T.STHAR_GCMIK as orderedQty,
+                        ISNULL(T.FIRMA_DOVTUT, 0) as shippedQty,
+                        (T.STHAR_GCMIK - ISNULL(T.FIRMA_DOVTUT, 0)) as remainingQty,
+                        ISNULL(ST.OLCU_BR1, 'ADET') as unit,
+                        T.DEPO_KODU as warehouseCode
                     FROM TBLSIPATRA T
                     LEFT JOIN TBLSTSABIT ST ON ST.STOK_KODU = T.STOK_KODU
                     WHERE RTRIM(T.FISNO) = RTRIM(@orderNo) 
