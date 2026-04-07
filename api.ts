@@ -221,6 +221,7 @@ const mapShipmentOrderData = (item: any) => {
     id: item.id || item.Id || item.inckeyNo || item.InckeyNo || Math.random().toString(36).substr(2, 9),
     durum: item.durum || item.Durum || 'B',
     sevkEmriNo: item.sevkEmriNo || item.SevkEmriNo || '',
+    siparisNo: item.siparisNo || item.SiparisNo || '',
     sipInckeyNo: item.sipInckeyNo || item.SipInckeyNo || 0,
     miktar: Number(item.miktar ?? item.Miktar ?? 0),
     depo: item.depo || item.Depo || 0,
