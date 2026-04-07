@@ -409,6 +409,8 @@ export const apiService = {
   },
   shipmentOrders: {
     getAll: () => request(`${API_BASE_URL}/shipmentorders`, undefined, [], mapShipmentOrderData),
+    getOpenOrders: () => request(`${API_BASE_URL}/shipmentorders/open-orders`, undefined, []),
+    getOrderLines: (orderNo: string) => request(`${API_BASE_URL}/shipmentorders/open-orders/${orderNo}/lines`, undefined, []),
     save: (data: any) => request(`${API_BASE_URL}/shipmentorders`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
