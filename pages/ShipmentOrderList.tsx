@@ -20,7 +20,9 @@ import {
   Smartphone,
   Eye,
   ArrowRightCircle,
-  Loader2
+  Loader2,
+  Plus,
+  Minus
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { ShipmentOrderItem } from '../types';
@@ -31,6 +33,7 @@ const ShipmentOrderList: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [showCompleted, setShowCompleted] = useState(false);
+  const [expandedNodes, setExpandedNodes] = useState<Record<string, boolean>>({});
 
   const fetchData = async () => {
     setLoading(true);
@@ -52,6 +55,46 @@ const ShipmentOrderList: React.FC = () => {
       return matchSearch && matchCompleted;
     });
   }, [data, searchTerm, showCompleted]);
+
+  // Group by Customer -> SevkEmriNo
+  const groupedData = useMemo(() => {
+    const groups: Record<string, Record<string, any[]>> = {};
+    filteredData.forEach(item => {
+      const customer = item.cariIsim || 'BİLİNMEYEN MÜŞTERİ';
+      const sevkEmriNo = item.sevkEmriNo || 'BİLİNMEYEN EMİR';
+
+      if (!groups[customer]) {
+        groups[customer] = {};
+      }
+      if (!groups[customer][sevkEmriNo]) {
+        groups[customer][sevkEmriNo] = [];
+      }
+      groups[customer][sevkEmriNo].push(item);
+    });
+    return groups;
+  }, [filteredData]);
+
+  const toggleNode = (nodeId: string) => {
+    setExpandedNodes(prev => ({
+      ...prev,
+      [nodeId]: !prev[nodeId]
+    }));
+  };
+
+  const expandAll = () => {
+    const allExpanded: Record<string, boolean> = {};
+    Object.entries(groupedData).forEach(([customer, orders]) => {
+      allExpanded[`cust_${customer}`] = true;
+      Object.keys(orders).forEach(sevkEmriNo => {
+        allExpanded[`order_${customer}_${sevkEmriNo}`] = true;
+      });
+    });
+    setExpandedNodes(allExpanded);
+  };
+
+  const collapseAll = () => {
+    setExpandedNodes({});
+  };
 
   const handleExportExcel = () => {
     const worksheet = XLSX.utils.json_to_sheet(filteredData);
@@ -110,8 +153,8 @@ const ShipmentOrderList: React.FC = () => {
          </div>
       </div>
 
-      <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm shrink-0">
-         <div className="relative group">
+      <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm shrink-0 flex items-center gap-4">
+         <div className="relative group flex-1">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-500 transition-colors" size={18} />
             <input 
                type="text" 
@@ -121,6 +164,10 @@ const ShipmentOrderList: React.FC = () => {
                onChange={(e) => setSearchTerm(e.target.value)}
             />
          </div>
+         <div className="flex items-center gap-2 border-l border-slate-200 pl-4">
+            <button onClick={expandAll} className="px-3 py-2 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-lg text-xs font-bold transition-colors">Tümünü Aç</button>
+            <button onClick={collapseAll} className="px-3 py-2 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-lg text-xs font-bold transition-colors">Tümünü Kapat</button>
+         </div>
       </div>
 
       <div className="flex-1 bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden flex flex-col relative">
@@ -128,9 +175,9 @@ const ShipmentOrderList: React.FC = () => {
             <table className="w-full text-left border-collapse min-w-[1400px]">
                <thead className="sticky top-0 z-10 bg-slate-900 text-white text-[10px] font-black uppercase tracking-[0.2em]">
                   <tr>
-                     <th className="px-8 py-5 border-r border-white/5">Sevk Emri No</th>
+                     <th className="px-8 py-5 border-r border-white/5 w-16 text-center"></th>
                      <th className="px-8 py-5 border-r border-white/5">Sipariş No</th>
-                     <th className="px-8 py-5 border-r border-white/5">Müşteri</th>
+                     <th className="px-8 py-5 border-r border-white/5">Sevk Emri No</th>
                      <th className="px-8 py-5 border-r border-white/5">Stok Bilgisi</th>
                      <th className="px-8 py-5 border-r border-white/5 text-center">Miktar</th>
                      <th className="px-8 py-5 border-r border-white/5 text-center">Depo</th>
@@ -148,38 +195,7 @@ const ShipmentOrderList: React.FC = () => {
                         </div>
                       </td>
                     </tr>
-                  ) : filteredData.map((item) => (
-                    <tr key={item.id} className={`hover:bg-indigo-50/10 transition-all group ${item.durum === 'T' ? 'bg-emerald-50/30' : ''}`}>
-                        <td className="px-8 py-5">
-                            <p className="text-xs font-black text-indigo-600 font-mono tracking-widest">{item.sevkEmriNo}</p>
-                        </td>
-                        <td className="px-8 py-5">
-                            {item.siparisNo ? (
-                               <p className="text-[10px] font-black text-slate-600 font-mono tracking-widest">{item.siparisNo}</p>
-                            ) : (
-                               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded border border-slate-200 bg-slate-50 text-[9px] font-black text-slate-500 uppercase">Manuel</span>
-                            )}
-                        </td>
-                        <td className="px-8 py-5">
-                            <p className="text-[10px] font-black text-slate-600 uppercase leading-tight">{item.cariIsim}</p>
-                        </td>
-                        <td className="px-8 py-5">
-                            <p className="text-xs font-bold text-slate-700 uppercase">{item.stokAdi}</p>
-                            <p className="text-[10px] text-slate-400 font-mono">{item.stokKodu}</p>
-                        </td>
-                        <td className="px-8 py-5 text-center font-black text-slate-800">{item.miktar.toLocaleString()}</td>
-                        <td className="px-8 py-5 text-center font-black text-slate-500">{item.depo}</td>
-                        <td className="px-8 py-5 text-center">
-                            <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full border text-[9px] font-black uppercase ${item.durum === 'T' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-amber-50 text-amber-600 border-amber-100'}`}>
-                                {item.durum === 'T' ? 'Tamamlandı' : item.durum === 'B' ? 'Beklemede' : 'İptal'}
-                            </div>
-                        </td>
-                        <td className="px-8 py-5 text-right">
-                           <button className="p-2 text-slate-300 hover:text-indigo-600 transition-colors opacity-0 group-hover:opacity-100"><MoreHorizontal size={18} /></button>
-                        </td>
-                    </tr>
-                  ))}
-                  {!loading && filteredData.length === 0 && (
+                  ) : Object.keys(groupedData).length === 0 ? (
                     <tr>
                       <td colSpan={8} className="py-20 text-center">
                         <div className="flex flex-col items-center gap-4 opacity-20">
@@ -188,6 +204,91 @@ const ShipmentOrderList: React.FC = () => {
                         </div>
                       </td>
                     </tr>
+                  ) : (
+                    Object.entries(groupedData).map(([customer, orders]) => {
+                      const customerNodeId = `cust_${customer}`;
+                      const isCustomerExpanded = expandedNodes[customerNodeId];
+                      const totalItemsForCustomer = Object.values(orders).flat().length;
+                      const totalOrdersForCustomer = Object.keys(orders).length;
+
+                      return (
+                        <React.Fragment key={customerNodeId}>
+                          {/* Level 1: Customer Header Row */}
+                          <tr className="bg-slate-100/80 hover:bg-slate-200 cursor-pointer transition-colors" onClick={() => toggleNode(customerNodeId)}>
+                             <td className="px-8 py-4 text-center">
+                                <button className="w-6 h-6 rounded-md bg-white border border-slate-300 flex items-center justify-center text-slate-600 hover:text-indigo-600 hover:border-indigo-400 transition-all">
+                                   {isCustomerExpanded ? <Minus size={14} /> : <Plus size={14} />}
+                                </button>
+                             </td>
+                             <td colSpan={7} className="px-8 py-4">
+                                <div className="flex items-center gap-3">
+                                   <span className="text-sm font-black text-slate-800 uppercase tracking-widest">{customer}</span>
+                                   <span className="px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 text-[9px] font-black">{totalOrdersForCustomer} SEVK EMRİ ({totalItemsForCustomer} KALEM)</span>
+                                </div>
+                             </td>
+                          </tr>
+                          
+                          {/* Level 2: Sevk Emri Header Row */}
+                          {isCustomerExpanded && Object.entries(orders).map(([sevkEmriNo, items]) => {
+                            const orderNodeId = `order_${customer}_${sevkEmriNo}`;
+                            const isOrderExpanded = expandedNodes[orderNodeId];
+                            const siparisNo = items[0]?.siparisNo;
+                            const durum = items[0]?.durum;
+
+                            return (
+                              <React.Fragment key={orderNodeId}>
+                                <tr className="bg-slate-50/80 hover:bg-slate-100 cursor-pointer transition-colors" onClick={() => toggleNode(orderNodeId)}>
+                                  <td className="px-8 py-3 text-right pr-4">
+                                    <button className="w-5 h-5 rounded border border-slate-200 bg-white inline-flex items-center justify-center text-slate-400 hover:text-indigo-600 transition-all ml-auto">
+                                      {isOrderExpanded ? <Minus size={12} /> : <Plus size={12} />}
+                                    </button>
+                                  </td>
+                                  <td className="px-8 py-3">
+                                      {siparisNo && siparisNo !== 'MANUEL' ? (
+                                         <p className="text-[10px] font-black text-slate-600 font-mono tracking-widest">{siparisNo}</p>
+                                      ) : (
+                                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded border border-slate-200 bg-slate-50 text-[9px] font-black text-slate-500 uppercase">Manuel</span>
+                                      )}
+                                  </td>
+                                  <td className="px-8 py-3">
+                                      <div className="flex items-center gap-2">
+                                        <p className="text-xs font-black text-indigo-600 font-mono tracking-widest">{sevkEmriNo}</p>
+                                        <span className="px-1.5 py-0.5 rounded bg-slate-200 text-slate-600 text-[8px] font-black">{items.length} KALEM</span>
+                                      </div>
+                                  </td>
+                                  <td colSpan={3} className="px-8 py-3"></td>
+                                  <td className="px-8 py-3 text-center">
+                                      <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full border text-[9px] font-black uppercase ${durum === 'T' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-amber-50 text-amber-600 border-amber-100'}`}>
+                                          {durum === 'T' ? 'Tamamlandı' : durum === 'B' ? 'Beklemede' : 'İptal'}
+                                      </div>
+                                  </td>
+                                  <td className="px-8 py-3"></td>
+                                </tr>
+
+                                {/* Level 3: Items */}
+                                {isOrderExpanded && items.map(item => (
+                                   <tr key={item.id} className={`hover:bg-indigo-50/10 transition-all group ${item.durum === 'T' ? 'bg-emerald-50/30' : ''}`}>
+                                      <td className="px-8 py-4"></td>
+                                      <td className="px-8 py-4"></td>
+                                      <td className="px-8 py-4"></td>
+                                      <td className="px-8 py-4">
+                                          <p className="text-xs font-bold text-slate-700 uppercase">{item.stokAdi}</p>
+                                          <p className="text-[10px] text-slate-400 font-mono">{item.stokKodu}</p>
+                                      </td>
+                                      <td className="px-8 py-4 text-center font-black text-slate-800">{item.miktar.toLocaleString()}</td>
+                                      <td className="px-8 py-4 text-center font-black text-slate-500">{item.depo}</td>
+                                      <td className="px-8 py-4 text-center"></td>
+                                      <td className="px-8 py-4 text-right">
+                                         <button className="p-2 text-slate-300 hover:text-indigo-600 transition-colors opacity-0 group-hover:opacity-100"><MoreHorizontal size={18} /></button>
+                                      </td>
+                                   </tr>
+                                ))}
+                              </React.Fragment>
+                            );
+                          })}
+                        </React.Fragment>
+                      );
+                    })
                   )}
                </tbody>
             </table>

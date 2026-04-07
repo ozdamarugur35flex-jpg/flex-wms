@@ -140,6 +140,7 @@ namespace tuckapi.Controllers
             {
                 // Yeni Sevk Emri Numarası Üret
                 string sevkEmriNo = "SEVK" + DateTime.Now.ToString("yyyyMMddHHmmss");
+                string finalSiparisNo = string.IsNullOrWhiteSpace(request.OrderNo) ? "MANUEL" : request.OrderNo;
 
                 foreach (var item in request.Items)
                 {
@@ -153,7 +154,7 @@ namespace tuckapi.Controllers
                     {
                         SevkEmriNo = sevkEmriNo,
                         SipInckeyNo = item.Id, // TBLSIPATRA INCKEYNO
-                        SiparisNo = request.OrderNo,
+                        SiparisNo = finalSiparisNo,
                         CustomerCode = request.CustomerCode,
                         StockCode = item.StockCode,
                         Quantity = item.ShipQty,

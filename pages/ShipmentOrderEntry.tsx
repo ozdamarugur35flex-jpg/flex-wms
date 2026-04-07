@@ -76,7 +76,8 @@ const ShipmentOrderEntry: React.FC = () => {
       setLoading(true);
       try {
         const lines = await apiService.shipmentOrders.getOrderLines(orderNo);
-        setOrderLines((lines || []).map((l: any) => ({ ...l, shipQty: 0 })));
+        // Set default shipQty to remainingQty
+        setOrderLines((lines || []).map((l: any) => ({ ...l, shipQty: l.remainingQty })));
       } catch (err) {
         console.error("Sipariş kalemleri yüklenemedi:", err);
       } finally {
