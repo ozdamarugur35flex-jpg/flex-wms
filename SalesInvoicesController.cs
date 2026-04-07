@@ -258,6 +258,11 @@ namespace tuckapi.Controllers
                 string finalInvoiceNo = "EIR" + cleanNo.PadLeft(12, '0'); // 3 + 12 = 15
                 if (finalInvoiceNo.Length > 15) finalInvoiceNo = finalInvoiceNo.Substring(0, 15);
 
+                // GIB Numarası oluşturma: EIR + YIL + (kalan 9 hane)
+                string currentYear = docDate.Year.ToString();
+                string gibInvoiceNo = "EIR" + currentYear + cleanNo.PadLeft(9, '0');
+                if (gibInvoiceNo.Length > 16) gibInvoiceNo = gibInvoiceNo.Substring(0, 16);
+
                 decimal calculatedBrut = 0;
                 decimal calculatedKdv = 0;
                 var processedItems = new List<dynamic>();
@@ -298,7 +303,7 @@ namespace tuckapi.Controllers
                         @Kod1, 'H', NULL, 'X', 1,
                         1, GETDATE(), 'FLEX_WMS', @GibInvoiceNo, @ProjectCode,
                         @ItemCount, 'A', 0, NULL,
-                        NULL, @Date, '001', 0, 'F', 'H'
+                        NULL, @Date, '001', 0, NULL, 'H'
                     )";
 
                 await conn.ExecuteAsync(sqlHeader, new
@@ -310,7 +315,7 @@ namespace tuckapi.Controllers
                     GenelToplam = calculatedGenelToplam,
                     KdvTutar = calculatedKdv,
                     Description = request.Description ?? "",
-                    GibInvoiceNo = string.Empty,
+                    GibInvoiceNo = gibInvoiceNo, // GIB_FATIRS_NO alanına EIR + YIL + 9 hane formatı yazılıyor
                     ProjectCode = request.ProjectCode,
                     ItemCount = processedItems.Count,
                     Kod1 = stharKod1
@@ -344,7 +349,7 @@ namespace tuckapi.Controllers
                             100, 1, 0, @Sira,
                             'I', @StharKod1, @CustomerCode, 0,
                             @VatRate, 0, 0, 0, 
-                            @CustomerCode, 'F', @Date,
+                            @CustomerCode, NULL, @Date,
                             @InvoiceNo, @Date, 0, @ProjectCode
                         )";
 
