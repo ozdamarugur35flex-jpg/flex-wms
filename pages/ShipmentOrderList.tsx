@@ -129,6 +129,7 @@ const ShipmentOrderList: React.FC = () => {
                <thead className="sticky top-0 z-10 bg-slate-900 text-white text-[10px] font-black uppercase tracking-[0.2em]">
                   <tr>
                      <th className="px-8 py-5 border-r border-white/5">Sevk Emri No</th>
+                     <th className="px-8 py-5 border-r border-white/5">Sipariş No</th>
                      <th className="px-8 py-5 border-r border-white/5">Müşteri</th>
                      <th className="px-8 py-5 border-r border-white/5">Stok Bilgisi</th>
                      <th className="px-8 py-5 border-r border-white/5 text-center">Miktar</th>
@@ -140,7 +141,7 @@ const ShipmentOrderList: React.FC = () => {
                <tbody className="divide-y divide-slate-100">
                   {loading ? (
                     <tr>
-                      <td colSpan={7} className="py-20 text-center">
+                      <td colSpan={8} className="py-20 text-center">
                         <div className="flex flex-col items-center gap-4">
                           <Loader2 size={40} className="text-indigo-600 animate-spin" />
                           <p className="text-xs font-black uppercase tracking-widest text-slate-400">Veriler Yükleniyor...</p>
@@ -151,6 +152,13 @@ const ShipmentOrderList: React.FC = () => {
                     <tr key={item.id} className={`hover:bg-indigo-50/10 transition-all group ${item.durum === 'T' ? 'bg-emerald-50/30' : ''}`}>
                         <td className="px-8 py-5">
                             <p className="text-xs font-black text-indigo-600 font-mono tracking-widest">{item.sevkEmriNo}</p>
+                        </td>
+                        <td className="px-8 py-5">
+                            {item.siparisNo ? (
+                               <p className="text-[10px] font-black text-slate-600 font-mono tracking-widest">{item.siparisNo}</p>
+                            ) : (
+                               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded border border-slate-200 bg-slate-50 text-[9px] font-black text-slate-500 uppercase">Manuel</span>
+                            )}
                         </td>
                         <td className="px-8 py-5">
                             <p className="text-[10px] font-black text-slate-600 uppercase leading-tight">{item.cariIsim}</p>
@@ -173,7 +181,7 @@ const ShipmentOrderList: React.FC = () => {
                   ))}
                   {!loading && filteredData.length === 0 && (
                     <tr>
-                      <td colSpan={7} className="py-20 text-center">
+                      <td colSpan={8} className="py-20 text-center">
                         <div className="flex flex-col items-center gap-4 opacity-20">
                           <Truck size={48} />
                           <p className="text-xs font-black uppercase tracking-widest">Kayıt Bulunamadı</p>

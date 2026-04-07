@@ -254,14 +254,15 @@ namespace tuckapi.Controllers
                 {
                     docDate = DateTime.Now;
                 }
-                string cleanNo = new string((request.InvoiceNo ?? "").Replace("EIR", "").Where(char.IsDigit).ToArray());
-                string finalInvoiceNo = "EIR" + cleanNo.PadLeft(12, '0'); // 3 + 12 = 15
-                if (finalInvoiceNo.Length > 15) finalInvoiceNo = finalInvoiceNo.Substring(0, 15);
+                string cleanNoStr = new string((request.InvoiceNo ?? "").Replace("EIR", "").Where(char.IsDigit).ToArray());
+                long parsedNo = 0;
+                long.TryParse(cleanNoStr, out parsedNo);
+
+                string finalInvoiceNo = "EIR" + parsedNo.ToString().PadLeft(12, '0'); // 3 + 12 = 15
 
                 // GIB Numarası oluşturma: EIR + YIL + (kalan 9 hane)
                 string currentYear = docDate.Year.ToString();
-                string gibInvoiceNo = "EIR" + currentYear + cleanNo.PadLeft(9, '0');
-                if (gibInvoiceNo.Length > 16) gibInvoiceNo = gibInvoiceNo.Substring(0, 16);
+                string gibInvoiceNo = "EIR" + currentYear + parsedNo.ToString().PadLeft(9, '0'); // 3 + 4 + 9 = 16
 
                 decimal calculatedBrut = 0;
                 decimal calculatedKdv = 0;

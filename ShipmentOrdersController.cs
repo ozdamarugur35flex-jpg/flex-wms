@@ -44,6 +44,7 @@ namespace tuckapi.Controllers
                         S.Id,
                         S.Durum,
                         S.SevkEmriNo,
+                        S.SiparisNo,
                         S.SipInckeyNo,
                         S.Miktar,
                         S.Depo,
