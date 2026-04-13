@@ -141,6 +141,31 @@ const PurchaseInvoice: React.FC = () => {
     });
   };
 
+  const handleNew = () => {
+    setInvoiceHeader({
+      invoiceNo: '',
+      date: today,
+      deliveryDate: today,
+      customerCode: '',
+      customerName: '',
+      type: 'YURT İÇİ',
+      description: ''
+    });
+    setItems([]);
+    setActiveTab('header');
+  };
+
+  const handleGetNextNo = async () => {
+    try {
+      const result = await apiService.purchaseInvoices.generateNextNo();
+      if (result && result.nextNo) {
+        setInvoiceHeader(prev => ({ ...prev, invoiceNo: result.nextNo }));
+      }
+    } catch (error) {
+      console.error('Next no error:', error);
+    }
+  };
+
   const handleSave = async () => {
     if (!invoiceHeader.invoiceNo || !invoiceHeader.customerCode || items.length === 0) {
       alert('Lütfen fatura numarası, tedarikçi ve en az bir kalem giriniz.');
@@ -209,7 +234,10 @@ const PurchaseInvoice: React.FC = () => {
         <div className="flex items-center gap-2">
           {canEdit && (
             <>
-              <button className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-600 rounded-xl text-xs font-bold hover:bg-slate-50 transition-all active:scale-95">
+              <button 
+                onClick={handleNew}
+                className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-600 rounded-xl text-xs font-bold hover:bg-slate-50 transition-all active:scale-95"
+              >
                 <Plus size={16} className="text-emerald-600" /> Yeni
               </button>
               <button 
@@ -263,15 +291,25 @@ const PurchaseInvoice: React.FC = () => {
                          <span>Fiş / Fatura Numarası (16 Hane Sabit)</span>
                          <span className={`${invoiceHeader.invoiceNo.length === 16 ? 'text-emerald-500' : 'text-rose-500'}`}>{invoiceHeader.invoiceNo.length}/16</span>
                       </label>
-                      <input 
-                        type="text" 
-                        maxLength={16}
-                        className="w-full px-5 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-black text-slate-800 outline-none focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 transition-all font-mono" 
-                        placeholder="Örn: 2024000000000001"
-                        value={invoiceHeader.invoiceNo}
-                        disabled={!canEdit}
-                        onChange={(e) => setInvoiceHeader({...invoiceHeader, invoiceNo: e.target.value})}
-                      />
+                      <div className="flex gap-2">
+                        <input 
+                          type="text" 
+                          maxLength={16}
+                          className="flex-1 px-5 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-black text-slate-800 outline-none focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 transition-all font-mono" 
+                          placeholder="Örn: 2024000000000001"
+                          value={invoiceHeader.invoiceNo}
+                          disabled={!canEdit}
+                          onChange={(e) => setInvoiceHeader({...invoiceHeader, invoiceNo: e.target.value})}
+                        />
+                        <button 
+                          onClick={handleGetNextNo}
+                          title="Sıradaki Numarayı Al"
+                          className="px-4 bg-slate-100 text-slate-600 rounded-2xl hover:bg-emerald-50 hover:text-emerald-600 transition-all border border-slate-200"
+                        >
+                          <RefreshCcw size={18} />
+                        </button>
+                      </div>
+                   </div>      />
                    </div>
                    
                    <div className="space-y-2">

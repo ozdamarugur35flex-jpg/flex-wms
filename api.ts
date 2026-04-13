@@ -380,6 +380,7 @@ export const apiService = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
     }, { success: true }),
+    generateNextNo: () => request(`${API_BASE_URL}/purchaseinvoices/next-no`, undefined, { nextNo: '' }),
     delete: (invoiceNo: string) => request(`${API_BASE_URL}/purchaseinvoices/${invoiceNo}`, { method: 'DELETE' }, { success: true }),
   },
 
