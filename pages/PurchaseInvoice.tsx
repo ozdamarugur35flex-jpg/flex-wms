@@ -309,7 +309,6 @@ const PurchaseInvoice: React.FC = () => {
                           <RefreshCcw size={18} />
                         </button>
                       </div>
-                   </div>      />
                    </div>
                    
                    <div className="space-y-2">
