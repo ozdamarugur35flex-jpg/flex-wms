@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
+import * as XLSX from 'xlsx';
 import { 
   Plus, Search, Filter, Trash2, PackageCheck, Save, XCircle, Camera, Info,
   FileSpreadsheet, Edit2, RotateCcw, Database, MoreHorizontal, Loader2,
@@ -28,6 +29,27 @@ const StockList: React.FC = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const exportToExcel = () => {
+    const dataToExport = filteredStocks.map(stock => ({
+      'Stok Kodu': stock.code,
+      'Stok Adı': stock.name,
+      'Barkod 1': stock.barcode1,
+      'Barkod 2': stock.barcode2,
+      'Barkod 3': stock.barcode3,
+      'Birim': stock.unit1,
+      'Grup Kodu': stock.groupCode,
+      'Miktar': stock.quantity,
+      'Min. Stok': stock.minStockLevel,
+      'KDV (%)': stock.purchaseVat,
+      'Son Alış Fiyatı': stock.lastPurchasePrice
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Stok Listesi");
+    XLSX.writeFile(workbook, "Netsis_Stok_Listesi.xlsx");
   };
 
   useEffect(() => {
@@ -130,6 +152,12 @@ const StockList: React.FC = () => {
             <span className="text-[10px] font-black text-slate-600 uppercase">YMA Grubu Hariç</span>
           </label>
           <button 
+            onClick={exportToExcel}
+            className="flex items-center gap-2 px-4 py-3 bg-emerald-600 text-white rounded-2xl text-xs font-black hover:bg-emerald-700 transition-all shadow-lg active:scale-95"
+          >
+            <FileSpreadsheet size={18} /> Excel'e Aktar
+          </button>
+          <button 
             onClick={() => handleOpenModal()}
             className="flex items-center gap-2 px-6 py-3 bg-indigo-600 text-white rounded-2xl text-xs font-black hover:bg-indigo-700 transition-all shadow-lg active:scale-95"
           >
@@ -164,10 +192,12 @@ const StockList: React.FC = () => {
               <thead>
                 <tr className="bg-slate-50/50 border-b border-slate-100 text-[11px] font-black text-slate-400 uppercase tracking-widest">
                   <th className="px-8 py-5">Ürün Tanımı</th>
+                  <th className="px-8 py-5 w-48">Barkod Bilgisi</th>
                   <th className="px-8 py-5 text-center">Birim</th>
                   <th className="px-8 py-5 text-center">Kilit</th>
                   <th className="px-8 py-5 text-right">Mevcut Bakiye</th>
-                  <th className="px-8 py-5 text-right">Son Alış</th>
+                  <th className="px-8 py-5 text-right">Alış Fiyatı</th>
+                  <th className="px-8 py-5 text-right">Satış Fiyatı</th>
                   <th className="px-8 py-5 text-right w-16"></th>
                 </tr>
               </thead>
@@ -189,6 +219,21 @@ const StockList: React.FC = () => {
                         </div>
                       </div>
                     </td>
+                    <td className="px-8 py-6">
+                      <div className="flex flex-col gap-1.5">
+                        {stock.barcode1 ? (
+                          <div className="flex items-center gap-1.5 px-2 py-1 bg-indigo-50 text-indigo-700 rounded-lg border border-indigo-100 w-fit">
+                            <Barcode size={12} />
+                            <span className="text-[10px] font-mono font-black">{stock.barcode1}</span>
+                          </div>
+                        ) : (
+                          <span className="text-[10px] text-slate-300 italic">Barkod Yok</span>
+                        )}
+                        {stock.barcode2 && (
+                          <span className="text-[9px] font-mono text-slate-400 ml-1">{stock.barcode2}</span>
+                        )}
+                      </div>
+                    </td>
                     <td className="px-8 py-6 text-center">
                       <span className="text-[10px] font-black text-slate-500 uppercase bg-slate-100 px-2 py-1 rounded border border-slate-200">{stock.unit1 || 'ADET'}</span>
                     </td>
@@ -201,7 +246,10 @@ const StockList: React.FC = () => {
                        </span>
                     </td>
                     <td className="px-8 py-6 text-right">
-                      <span className="text-sm font-black text-emerald-600">₺{(Number(stock.lastPurchasePrice) || 0).toFixed(2)}</span>
+                      <span className="text-sm font-black text-slate-600">₺{(Number(stock.lastPurchasePrice) || 0).toFixed(2)}</span>
+                    </td>
+                    <td className="px-8 py-6 text-right">
+                      <span className="text-sm font-black text-indigo-600">₺{(Number(stock.salesPrice1) || 0).toFixed(2)}</span>
                     </td>
                     <td className="px-8 py-6 text-right">
                       <button className="p-2 text-slate-300 hover:text-indigo-600 transition-colors opacity-0 group-hover:opacity-100">
@@ -343,13 +391,33 @@ const StockList: React.FC = () => {
                       />
                     </div>
                     <div>
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-1 block">Gümrük Tarife Kodu</label>
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-1 block">Satıcı Kodu</label>
                       <input 
                         type="text" 
-                        value={editingStock.customsCode || ''}
-                        onChange={(e) => setEditingStock({...editingStock, customsCode: e.target.value})}
+                        value={editingStock.saticiKodu || ''}
+                        onChange={(e) => setEditingStock({...editingStock, saticiKodu: e.target.value})}
                         className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none focus:border-indigo-500 transition-all"
                       />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-1 block">Depo Kodu</label>
+                        <input 
+                          type="number" 
+                          value={editingStock.depoKodu || 0}
+                          onChange={(e) => setEditingStock({...editingStock, depoKodu: parseInt(e.target.value) || 0})}
+                          className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none focus:border-indigo-500 transition-all"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-1 block">Gümrük Tarife Kodu</label>
+                        <input 
+                          type="text" 
+                          value={editingStock.gumrukTarifeKodu || ''}
+                          onChange={(e) => setEditingStock({...editingStock, gumrukTarifeKodu: e.target.value})}
+                          className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none focus:border-indigo-500 transition-all"
+                        />
+                      </div>
                     </div>
 
                     <div className="p-6 bg-slate-50 rounded-[2rem] border border-slate-200 space-y-4">
@@ -402,6 +470,37 @@ const StockList: React.FC = () => {
                       </div>
                     </div>
 
+                    <h4 className="text-sm font-black text-slate-800 uppercase tracking-tight border-b border-slate-100 pb-2 mt-8">Birim Çevrimleri</h4>
+                    <div className="grid grid-cols-3 gap-4">
+                      <div>
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-1 block">Ölçü Br 2</label>
+                        <input 
+                          type="text" 
+                          value={editingStock.unit2 || ''}
+                          onChange={(e) => setEditingStock({...editingStock, unit2: e.target.value})}
+                          className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none focus:border-indigo-500 transition-all"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-1 block">Pay 1</label>
+                        <input 
+                          type="number" 
+                          value={editingStock.pay1 || 0}
+                          onChange={(e) => setEditingStock({...editingStock, pay1: parseFloat(e.target.value) || 0})}
+                          className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none focus:border-indigo-500 transition-all"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-1 block">Payda 1</label>
+                        <input 
+                          type="number" 
+                          value={editingStock.payda1 || 0}
+                          onChange={(e) => setEditingStock({...editingStock, payda1: parseFloat(e.target.value) || 0})}
+                          className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none focus:border-indigo-500 transition-all"
+                        />
+                      </div>
+                    </div>
+
                     <h4 className="text-sm font-black text-slate-800 uppercase tracking-tight border-b border-slate-100 pb-2 mt-8">Stok Seviyeleri</h4>
                     <div className="grid grid-cols-2 gap-4">
                       <div>
@@ -436,15 +535,25 @@ const StockList: React.FC = () => {
                         <option>04 - TİCARİ MAL HESAPLARI</option>
                       </select>
                     </div>
-                    <div className="p-6 bg-indigo-50 rounded-[2rem] border border-indigo-100">
-                      <div className="flex items-center gap-3 mb-4">
+                    <div className="p-6 bg-indigo-50 rounded-[2rem] border border-indigo-100 space-y-4">
+                      <div className="flex items-center gap-3">
                         <Calculator className="text-indigo-600" size={20} />
-                        <span className="text-xs font-black text-indigo-900 uppercase tracking-widest">Son Alış Bilgisi</span>
+                        <span className="text-xs font-black text-indigo-900 uppercase tracking-widest">Fiyat Bilgileri</span>
                       </div>
-                      <div className="flex items-end justify-between">
+                      <div className="grid grid-cols-2 gap-4">
                         <div>
-                          <p className="text-[10px] text-indigo-400 font-bold uppercase tracking-widest mb-1">Birim Fiyat</p>
-                          <p className="text-2xl font-black text-indigo-600 tracking-tighter">₺{(Number(editingStock.lastPurchasePrice) || 0).toFixed(2)}</p>
+                          <p className="text-[10px] text-indigo-400 font-bold uppercase tracking-widest mb-1">Son Alış (İrsaliye)</p>
+                          <p className="text-xl font-black text-slate-700 tracking-tighter">₺{(Number(editingStock.lastPurchasePrice) || 0).toFixed(2)}</p>
+                        </div>
+                        <div>
+                          <p className="text-[10px] text-indigo-400 font-bold uppercase tracking-widest mb-1">Satış Fiyatı (Fiyat-1)</p>
+                          <p className="text-xl font-black text-indigo-600 tracking-tighter">₺{(Number(editingStock.salesPrice1) || 0).toFixed(2)}</p>
+                        </div>
+                      </div>
+                      <div className="pt-4 border-t border-indigo-100 flex items-center justify-between">
+                        <div>
+                          <p className="text-[10px] text-indigo-400 font-bold uppercase tracking-widest mb-1">Birim Çevrim (KULL1N)</p>
+                          <p className="text-lg font-black text-indigo-900">{editingStock.cevrimSayisi || 0}</p>
                         </div>
                         <div className="text-right">
                           <p className="text-[10px] text-indigo-400 font-bold uppercase tracking-widest mb-1">Son Hareket</p>
@@ -462,29 +571,29 @@ const StockList: React.FC = () => {
                     <h4 className="text-sm font-black text-slate-800 uppercase tracking-tight border-b border-slate-100 pb-2">Boyut Bilgileri (mm)</h4>
                     <div className="grid grid-cols-3 gap-4">
                       <div>
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-1 block">En</label>
+                        <input 
+                          type="number" 
+                          value={editingStock.en ?? 0}
+                          onChange={(e) => setEditingStock({...editingStock, en: parseFloat(e.target.value) || 0})}
+                          className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none focus:border-indigo-500 transition-all"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-1 block">Boy</label>
+                        <input 
+                          type="number" 
+                          value={editingStock.boy ?? 0}
+                          onChange={(e) => setEditingStock({...editingStock, boy: parseFloat(e.target.value) || 0})}
+                          className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none focus:border-indigo-500 transition-all"
+                        />
+                      </div>
+                      <div>
                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-1 block">Genişlik</label>
                         <input 
                           type="number" 
-                          value={editingStock.width ?? 0}
-                          onChange={(e) => setEditingStock({...editingStock, width: parseFloat(e.target.value) || 0})}
-                          className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none focus:border-indigo-500 transition-all"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-1 block">Yükseklik</label>
-                        <input 
-                          type="number" 
-                          value={editingStock.height ?? 0}
-                          onChange={(e) => setEditingStock({...editingStock, height: parseFloat(e.target.value) || 0})}
-                          className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none focus:border-indigo-500 transition-all"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-1 block">Derinlik</label>
-                        <input 
-                          type="number" 
-                          value={editingStock.depth ?? 0}
-                          onChange={(e) => setEditingStock({...editingStock, depth: parseFloat(e.target.value) || 0})}
+                          value={editingStock.genislik ?? 0}
+                          onChange={(e) => setEditingStock({...editingStock, genislik: parseFloat(e.target.value) || 0})}
                           className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none focus:border-indigo-500 transition-all"
                         />
                       </div>

@@ -70,7 +70,7 @@ const SearchableSelect: React.FC<SearchableSelectProps> = ({
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
-            className="absolute z-50 w-full mt-2 bg-white border border-slate-200 rounded-2xl shadow-2xl overflow-hidden"
+            className="absolute z-50 min-w-full lg:min-w-[400px] mt-2 bg-white border border-slate-200 rounded-2xl shadow-2xl overflow-hidden"
           >
             <div className="p-3 border-b border-slate-100 flex items-center gap-2 bg-slate-50">
               <Search size={16} className="text-slate-400" />

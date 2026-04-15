@@ -10,6 +10,10 @@ export interface StockCard {
   barcode3?: string;
   groupCode?: string;
   unit1: string;
+  unit2?: string;
+  unit3?: string;
+  pay1?: number;
+  payda1?: number;
   purchaseVat: number;
   salesVat: number;
   purchasePrices: number[];
@@ -34,6 +38,18 @@ export interface StockCard {
   kod3?: string;
   kod4?: string;
   kod5?: string;
+  muhDetayKodu?: string;
+  saticiKodu?: string;
+  alisFiat1?: number;
+  satisFiat1?: number;
+  depoKodu?: number;
+  en?: number;
+  boy?: number;
+  genislik?: number;
+  gumrukTarifeKodu?: string;
+  uretiKodu?: string;
+  cevrimSayisi?: number;
+  salesPrice1?: number;
 }
 
 export interface CustomerCard { 

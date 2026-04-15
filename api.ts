@@ -289,6 +289,8 @@ const mapStockData = (item: any) => {
     producerCode: item.producerCode || item.ProducerCode || '',
     customsCode: item.customsCode || item.CustomsCode || '',
     leadTime: Number(item.leadTime ?? item.LeadTime ?? 0),
+    cevrimSayisi: Number(item.cevrimSayisi ?? item.CevrimSayisi ?? 0),
+    salesPrice1: Number(item.salesPrice1 ?? item.SalesPrice1 ?? 0),
   };
 };
 

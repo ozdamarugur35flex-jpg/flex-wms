@@ -411,13 +411,15 @@ const PurchaseInvoice: React.FC = () => {
       ) : (
         <div className="space-y-6 animate-in slide-in-from-right-4 duration-500">
            {/* QUICK LINE ENTRY */}
-           <div className={`bg-slate-900 p-8 rounded-[2.5rem] text-white shadow-2xl space-y-8 relative overflow-hidden ${!canEdit ? 'opacity-50 grayscale' : ''}`}>
-              <div className="absolute top-0 right-0 p-12 opacity-5 pointer-events-none rotate-12">
-                 <Layers size={140} />
+           <div className={`bg-slate-900 p-8 rounded-[2.5rem] text-white shadow-2xl space-y-8 relative ${!canEdit ? 'opacity-50 grayscale' : ''}`}>
+              <div className="absolute inset-0 overflow-hidden rounded-[2.5rem] pointer-events-none">
+                 <div className="absolute top-0 right-0 p-12 opacity-5 rotate-12">
+                    <Layers size={140} />
+                 </div>
               </div>
               
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-end relative z-10">
-                 <div className="lg:col-span-4">
+                 <div className="lg:col-span-6">
                     <SearchableSelect 
                       label="Stok Kartı Seçimi"
                       placeholder="Stok Seçiniz..."
@@ -438,7 +440,7 @@ const PurchaseInvoice: React.FC = () => {
                     </select>
                  </div>
 
-                 <div className="lg:col-span-2 space-y-2">
+                 <div className="lg:col-span-1 space-y-2">
                     <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Miktar</label>
                     <input 
                       type="number" 
@@ -450,13 +452,13 @@ const PurchaseInvoice: React.FC = () => {
                     />
                  </div>
 
-                 <div className="lg:col-span-2 space-y-2">
-                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Birim Fiyat (TL)</label>
+                 <div className="lg:col-span-1 space-y-2">
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Fiyat</label>
                     <input 
                       type="number" 
                       disabled={!canEdit}
                       className="w-full px-5 py-4 bg-white/10 border border-white/20 rounded-[1.5rem] text-sm font-black outline-none focus:border-emerald-500 text-center" 
-                      placeholder="Fiyat girilmeyebilir" 
+                      placeholder="0" 
                       value={lineEntry.price || ''}
                       onChange={(e) => setLineEntry({...lineEntry, price: parseFloat(e.target.value) || 0})}
                     />
