@@ -259,6 +259,7 @@ const mapStockData = (item: any) => {
     minStockLevel: Number(item.minStockLevel ?? item.MinStockLevel ?? 0),
     maxStockLevel: Number(item.maxStockLevel ?? item.MaxStockLevel ?? 0),
     lastPurchasePrice: Number(item.lastPurchasePrice ?? item.LastPurchasePrice ?? 0),
+    lastPurchaseYear: item.lastPurchaseYear || item.LastPurchaseYear || '',
     isLocked: !!(item.isLocked ?? item.IsLocked ?? false),
     isAutoConsumption: !!(item.isAutoConsumption ?? item.IsAutoConsumption ?? false),
     groupCode: item.groupCode || item.GroupCode || '',

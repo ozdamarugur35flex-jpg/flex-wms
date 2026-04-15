@@ -28,15 +28,22 @@ namespace FlexWms.Api.Controllers
                                    S.KOD_1, S.KOD_2, S.KOD_3, S.KOD_4, S.KOD_5, S.MUH_DETAYKODU, S.SATICI_KODU, S.DEPO_KODU,
                                    S.EN, S.BOY, S.GENISLIK, S.GUMRUKTARIFEKODU, S.URETICI_KODU, S.ASGARI_STOK, S.TEMIN_SURESI, S.KILIT, S.SAFKOD,
                                    EK.KULL1N as CEVRIM_SAYISI,
-                                   (SELECT TOP 1 STHAR_NF FROM TBLSTHAR WITH(NOLOCK) 
-                                    WHERE STOK_KODU = S.STOK_KODU 
-                                    AND STHAR_GCKOD = 'G' 
-                                    AND STHAR_NF > 0
-                                    AND FISNO IS NOT NULL AND FISNO <> ''
-                                    ORDER BY STHAR_TARIH DESC, STHAR_TESTAR DESC, INCKEYNO DESC) as SON_ALIS_FIYATI
+                                   COALESCE(
+                                       (SELECT TOP 1 STHAR_NF FROM TBLSTHAR WITH(NOLOCK) 
+                                        WHERE STOK_KODU = S.STOK_KODU AND STHAR_GCKOD = 'G' AND STHAR_NF > 0 AND FISNO IS NOT NULL AND FISNO <> ''
+                                        ORDER BY STHAR_TARIH DESC, STHAR_TESTAR DESC, INCKEYNO DESC),
+                                       (SELECT TOP 1 STHAR_NF FROM MERACK25.dbo.TBLSTHAR WITH(NOLOCK) 
+                                        WHERE STOK_KODU = S.STOK_KODU AND STHAR_GCKOD = 'G' AND STHAR_NF > 0 AND FISNO IS NOT NULL AND FISNO <> ''
+                                        ORDER BY STHAR_TARIH DESC, STHAR_TESTAR DESC, INCKEYNO DESC)
+                                   ) as SON_ALIS_FIYATI,
+                                   CASE 
+                                       WHEN EXISTS (SELECT 1 FROM TBLSTHAR WITH(NOLOCK) WHERE STOK_KODU = S.STOK_KODU AND STHAR_GCKOD = 'G' AND STHAR_NF > 0 AND FISNO IS NOT NULL AND FISNO <> '') THEN '26'
+                                       WHEN EXISTS (SELECT 1 FROM MERACK25.dbo.TBLSTHAR WITH(NOLOCK) WHERE STOK_KODU = S.STOK_KODU AND STHAR_GCKOD = 'G' AND STHAR_NF > 0 AND FISNO IS NOT NULL AND FISNO <> '') THEN '25'
+                                       ELSE ''
+                                   END as SON_ALIS_YILI
                                    FROM TBLSTSABIT S WITH(NOLOCK) 
                                    LEFT JOIN TBLSTSABITEK EK WITH(NOLOCK) ON S.STOK_KODU = EK.STOK_KODU
-                                   WHERE 1=1";
+                                   WHERE S.KOD_2 = 'MERKEZ'";
 
                     if (!includeYM)
                     {
@@ -66,6 +73,7 @@ namespace FlexWms.Api.Controllers
                                 SalesPrice1 = rdr["SATIS_FIYATI_1"] != DBNull.Value ? Convert.ToDouble(rdr["SATIS_FIYATI_1"]) : 0,
                                 AlisFiat1 = rdr["ALIS_FIAT1"] != DBNull.Value ? Convert.ToDouble(rdr["ALIS_FIAT1"]) : 0,
                                 LastPurchasePrice = rdr["SON_ALIS_FIYATI"] != DBNull.Value ? Convert.ToDouble(rdr["SON_ALIS_FIYATI"]) : 0,
+                                LastPurchaseYear = rdr["SON_ALIS_YILI"]?.ToString().Trim(),
                                 CevrimSayisi = rdr["CEVRIM_SAYISI"] != DBNull.Value ? Convert.ToDouble(rdr["CEVRIM_SAYISI"]) : 0,
                                 Barcode1 = rdr["BARKOD1"]?.ToString().Trim() ?? "",
                                 Barcode2 = rdr["BARKOD2"]?.ToString().Trim() ?? "",
@@ -111,12 +119,19 @@ namespace FlexWms.Api.Controllers
                                    S.KOD_1, S.KOD_2, S.KOD_3, S.KOD_4, S.KOD_5, S.MUH_DETAYKODU, S.SATICI_KODU, S.DEPO_KODU,
                                    S.EN, S.BOY, S.GENISLIK, S.GUMRUKTARIFEKODU, S.URETICI_KODU, S.ASGARI_STOK, S.TEMIN_SURESI, S.KILIT, S.SAFKOD,
                                    EK.KULL1N as CEVRIM_SAYISI,
-                                   (SELECT TOP 1 STHAR_NF FROM TBLSTHAR WITH(NOLOCK) 
-                                    WHERE STOK_KODU = S.STOK_KODU 
-                                    AND STHAR_GCKOD = 'G' 
-                                    AND STHAR_NF > 0
-                                    AND FISNO IS NOT NULL AND FISNO <> ''
-                                    ORDER BY STHAR_TARIH DESC, STHAR_TESTAR DESC, INCKEYNO DESC) as SON_ALIS_FIYATI
+                                   COALESCE(
+                                       (SELECT TOP 1 STHAR_NF FROM TBLSTHAR WITH(NOLOCK) 
+                                        WHERE STOK_KODU = S.STOK_KODU AND STHAR_GCKOD = 'G' AND STHAR_NF > 0 AND FISNO IS NOT NULL AND FISNO <> ''
+                                        ORDER BY STHAR_TARIH DESC, STHAR_TESTAR DESC, INCKEYNO DESC),
+                                       (SELECT TOP 1 STHAR_NF FROM MERACK25.dbo.TBLSTHAR WITH(NOLOCK) 
+                                        WHERE STOK_KODU = S.STOK_KODU AND STHAR_GCKOD = 'G' AND STHAR_NF > 0 AND FISNO IS NOT NULL AND FISNO <> ''
+                                        ORDER BY STHAR_TARIH DESC, STHAR_TESTAR DESC, INCKEYNO DESC)
+                                   ) as SON_ALIS_FIYATI,
+                                   CASE 
+                                       WHEN EXISTS (SELECT 1 FROM TBLSTHAR WITH(NOLOCK) WHERE STOK_KODU = S.STOK_KODU AND STHAR_GCKOD = 'G' AND STHAR_NF > 0 AND FISNO IS NOT NULL AND FISNO <> '') THEN '26'
+                                       WHEN EXISTS (SELECT 1 FROM MERACK25.dbo.TBLSTHAR WITH(NOLOCK) WHERE STOK_KODU = S.STOK_KODU AND STHAR_GCKOD = 'G' AND STHAR_NF > 0 AND FISNO IS NOT NULL AND FISNO <> '') THEN '25'
+                                       ELSE ''
+                                   END as SON_ALIS_YILI
                                    FROM TBLSTSABIT S WITH(NOLOCK) 
                                    LEFT JOIN TBLSTSABITEK EK WITH(NOLOCK) ON S.STOK_KODU = EK.STOK_KODU
                                    WHERE S.STOK_KODU = @code";
@@ -143,6 +158,7 @@ namespace FlexWms.Api.Controllers
                                 SalesPrice1 = rdr["SATIS_FIYATI_1"] != DBNull.Value ? Convert.ToDouble(rdr["SATIS_FIYATI_1"]) : 0,
                                 AlisFiat1 = rdr["ALIS_FIAT1"] != DBNull.Value ? Convert.ToDouble(rdr["ALIS_FIAT1"]) : 0,
                                 LastPurchasePrice = rdr["SON_ALIS_FIYATI"] != DBNull.Value ? Convert.ToDouble(rdr["SON_ALIS_FIYATI"]) : 0,
+                                LastPurchaseYear = rdr["SON_ALIS_YILI"]?.ToString().Trim(),
                                 CevrimSayisi = rdr["CEVRIM_SAYISI"] != DBNull.Value ? Convert.ToDouble(rdr["CEVRIM_SAYISI"]) : 0,
                                 Barcode1 = rdr["BARKOD1"]?.ToString().Trim() ?? "",
                                 Barcode2 = rdr["BARKOD2"]?.ToString().Trim() ?? "",

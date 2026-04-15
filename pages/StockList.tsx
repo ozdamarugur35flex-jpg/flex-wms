@@ -215,7 +215,14 @@ const StockList: React.FC = () => {
                         </div>
                         <div>
                           <p className="text-sm font-black text-slate-800 leading-none mb-1 uppercase">{stock.name || 'İSİMSİZ'}</p>
-                          <p className="text-[10px] text-slate-400 font-mono font-bold uppercase">{stock.code || 'KODSUZ'}</p>
+                          <div className="flex items-center gap-2">
+                            <p className="text-[10px] text-slate-400 font-mono font-bold uppercase">{stock.code || 'KODSUZ'}</p>
+                            {stock.kod1 && (
+                              <span className="text-[9px] px-1.5 py-0.5 bg-slate-100 text-slate-500 rounded font-bold border border-slate-200 uppercase">
+                                {stock.kod1}
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </td>
@@ -246,7 +253,12 @@ const StockList: React.FC = () => {
                        </span>
                     </td>
                     <td className="px-8 py-6 text-right">
-                      <span className="text-sm font-black text-slate-600">₺{(Number(stock.lastPurchasePrice) || 0).toFixed(2)}</span>
+                      <div className="flex flex-col items-end">
+                        <span className="text-sm font-black text-slate-600">₺{(Number(stock.lastPurchasePrice) || 0).toFixed(2)}</span>
+                        {stock.lastPurchaseYear && (
+                          <span className="text-[9px] font-bold text-slate-400">/ {stock.lastPurchaseYear}</span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-8 py-6 text-right">
                       <span className="text-sm font-black text-indigo-600">₺{(Number(stock.salesPrice1) || 0).toFixed(2)}</span>
