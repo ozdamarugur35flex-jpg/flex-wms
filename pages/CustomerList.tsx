@@ -110,13 +110,6 @@ const CustomerList: React.FC = () => {
         </div>
         
         <div className="flex items-center gap-2">
-          <button onClick={() => {
-            setFormData({ type: 'Alıcı', locationType: 'Yurt İçi', code: '', name: '', phone: '', email: '', taxNumber: '', taxOffice: '' });
-            setIsEditing(false);
-            setIsModalOpen(true);
-          }} className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold hover:bg-indigo-700 transition-all active:scale-95 shadow-md">
-            <UserPlus size={16} /> Yeni Cari
-          </button>
           <button onClick={loadCustomers} className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-600 rounded-xl text-xs font-bold hover:bg-slate-50 transition-all active:scale-95">
             <RotateCcw size={16} className={loading ? 'animate-spin' : ''} /> Yenile
           </button>
@@ -250,12 +243,11 @@ const CustomerList: React.FC = () => {
                   <th className="px-6 py-4 text-[11px] font-black text-slate-400 uppercase tracking-widest text-center">Tip</th>
                   <th className="px-6 py-4 text-[11px] font-black text-slate-400 uppercase tracking-widest">İletişim</th>
                   <th className="px-6 py-4 text-[11px] font-black text-slate-400 uppercase tracking-widest">Vergi No</th>
-                  <th className="px-6 py-4 text-[11px] font-black text-slate-400 uppercase tracking-widest text-right"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {filteredCustomers.map((customer, index) => (
-                  <tr key={customer.code || customer.id || index} className="hover:bg-indigo-50/30 transition-colors group cursor-pointer">
+                  <tr key={customer.code || customer.id || index} className="hover:bg-indigo-50/30 transition-colors group">
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
                         <div className={`w-9 h-9 rounded-lg flex items-center justify-center text-xs font-black ${customer.type === 'Alıcı' ? 'bg-sky-50 text-sky-600' : 'bg-amber-50 text-amber-600'}`}>
@@ -278,30 +270,6 @@ const CustomerList: React.FC = () => {
                     </td>
                     <td className="px-6 py-4">
                       <p className="text-xs font-mono text-slate-500 uppercase">{customer.taxNumber}</p>
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-all">
-                        <button 
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleEdit(customer);
-                          }}
-                          className="p-2 text-slate-400 hover:text-indigo-600 transition-all"
-                          title="Düzenle"
-                        >
-                          <FileText size={18} />
-                        </button>
-                        <button 
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDelete(customer.code);
-                          }}
-                          className="p-2 text-slate-400 hover:text-rose-600 transition-all"
-                          title="Sil"
-                        >
-                          <Trash2 size={18} />
-                        </button>
-                      </div>
                     </td>
                   </tr>
                 ))}

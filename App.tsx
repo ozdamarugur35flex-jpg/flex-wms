@@ -95,6 +95,7 @@ const AppContent: React.FC = () => {
   const [isSidebarOpen, setSidebarOpen] = useState(true);
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({
     "Yapay Zeka": true,
+    "Belgeler": true,
     "Kartlar & Tanımlar": false,
     "Satınalma & Giriş": false,
     "Satış & Sevkiyat": false,
@@ -119,6 +120,14 @@ const AppContent: React.FC = () => {
       ]
     },
     {
+      title: "Belgeler",
+      items: [
+        { id: 'alis-irsaliye-giris', label: 'Alış İrsaliyesi Giriş', icon: <FileDown size={18} />, path: '/alis-irsaliye' },
+        { id: 'satis-irsaliye-giris', label: 'Satış İrsaliye Girişi', icon: <FileUp size={18} />, path: '/satis-irsaliye' },
+        { id: 'ambar-giris-cikis', label: 'Ambar Giriş Çıkış', icon: <Factory size={18} />, path: '/uretim-kayit' },
+      ]
+    },
+    {
       title: "Kartlar & Tanımlar",
       items: [
         { id: 'stok-kart', label: 'Stok Kartları', icon: <Package size={18} />, path: '/stok-kart' },
@@ -130,7 +139,6 @@ const AppContent: React.FC = () => {
         { id: 'depo-kapasite', label: 'Kapasite Tanımları', icon: <Gauge size={18} />, path: '/depo-kapasite' },
         { id: 'satin-alma-talep', label: 'Satın Alma Talepleri', icon: <ShoppingCart size={18} />, path: '/satin-alma-talep' },
         { id: 'satin-alma-siparis', label: 'Satın Alma Siparişleri', icon: <Truck size={18} />, path: '/satin-alma-siparis' },
-        { id: 'satin-alma-irsaliye', label: 'Alış İrsaliyeleri', icon: <Receipt size={18} />, path: '/satin-alma-irsaliye' },
         { id: 'varyant-tanim', label: 'Varyant Tanımları', icon: <Layers size={18} />, path: '/varyant-definition' },
         { id: 'min-stok', label: 'Minimum Stok Listesi', icon: <MinusCircle size={18} />, path: '/min-stok' },
       ]
@@ -140,7 +148,6 @@ const AppContent: React.FC = () => {
       items: [
         { id: 'satinalma-talep', label: 'Satınalma Talepleri', icon: <FilePlus size={18} />, path: '/satinalma-talep' },
         { id: 'satinalma-siparis', label: 'Satınalma Siparişleri', icon: <ShoppingCart size={18} />, path: '/satinalma-siparis' },
-        { id: 'alis-irsaliye', label: 'Alış İrsaliyeleri', icon: <FileDown size={18} />, path: '/alis-irsaliye' },
         { id: 'malzeme-takip', label: 'Malzeme Sipariş Durum', icon: <PackageSearch size={18} />, path: '/malzeme-siparis-durum' },
       ]
     },
@@ -150,7 +157,6 @@ const AppContent: React.FC = () => {
         { id: 'musteri-siparis', label: 'Müşteri Siparişleri', icon: <FileStack size={18} />, path: '/musteri-siparis' },
         { id: 'siparis-onay', label: 'Sipariş Onay Paneli', icon: <CheckCircle2 size={18} />, path: '/siparis-onay' },
         { id: 'siparis-sablon', label: 'Sipariş Şablonları', icon: <FileJson size={18} />, path: '/siparis-sablon' },
-        { id: 'satis-irsaliye', label: 'Satış İrsaliyeleri', icon: <FileUp size={18} />, path: '/satis-irsaliye' },
         { id: 'sevk-emri-giris', label: 'Sevk Emri Girişi', icon: <Truck size={18} />, path: '/sevk-emri-giris' },
         { id: 'sevk-emri-liste', label: 'Sevk Emri Listesi', icon: <LayoutList size={18} />, path: '/rapor-sevk-emri' },
         { id: 'musteri-sip-durum', label: 'Müşteri Sipariş Durum', icon: <ClipboardList size={18} />, path: '/musteri-siparis-durum' },
@@ -160,7 +166,6 @@ const AppContent: React.FC = () => {
       title: "Depo & Üretim",
       items: [
         { id: 'stok-hareket', label: 'Stok Hareket Kaydı', icon: <History size={18} />, path: '/stok-hareket' },
-        { id: 'uretim-kayit', label: 'Üretim Kayıtları', icon: <Factory size={18} />, path: '/uretim-kayit' },
         { id: 'depolar-arasi', label: 'Depolar Arası Transfer', icon: <ArrowLeftRight size={18} />, path: '/depolar-arasi' },
         { id: 'stok-sifirlama', label: 'Stok Sıfırlama (Reset)', icon: <RefreshCcw size={18} className="text-rose-500" />, path: '/stok-sifirlama' },
         { id: 'etiket-basim', label: 'Etiket Basım Modülü', icon: <Tag size={18} />, path: '/etiket-basim' },

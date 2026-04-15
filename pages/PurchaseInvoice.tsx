@@ -24,7 +24,8 @@ import {
   RefreshCcw,
   Globe,
   Lock,
-  Loader2
+  Loader2,
+  ArrowRight
 } from 'lucide-react';
 import { InvoiceItem, StockCard, CustomerCard } from '../types';
 import { apiService } from '../api';
@@ -32,13 +33,16 @@ import SearchableSelect from '../components/SearchableSelect';
 
 const PurchaseInvoice: React.FC = () => {
   const today = new Date().toISOString().split('T')[0];
-  const [activeTab, setActiveTab] = useState<'header' | 'lines'>('header');
+  const [activeTab, setActiveTab] = useState<'header' | 'lines' | 'history'>('header');
   const [isExtraFieldsOpen, setExtraFieldsOpen] = useState(false);
   const [items, setItems] = useState<InvoiceItem[]>([]);
   const [stocks, setStocks] = useState<StockCard[]>([]);
   const [customers, setCustomers] = useState<CustomerCard[]>([]);
+  const [history, setHistory] = useState<any[]>([]);
+  const [isHistoryLoading, setIsHistoryLoading] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
   
   // Header State
   const [invoiceHeader, setInvoiceHeader] = useState({
@@ -79,8 +83,52 @@ const PurchaseInvoice: React.FC = () => {
     fetchData();
   }, []);
 
+  useEffect(() => {
+    if (activeTab === 'history') {
+      fetchHistory();
+    }
+  }, [activeTab]);
+
+  const fetchHistory = async () => {
+    setIsHistoryLoading(true);
+    try {
+      const data = await apiService.purchaseInvoices.getAll();
+      setHistory(data || []);
+    } catch (error) {
+      console.error('History fetch error:', error);
+    } finally {
+      setIsHistoryLoading(false);
+    }
+  };
+
+  const handleViewDetail = async (invoiceNo: string) => {
+    setIsLoading(true);
+    try {
+      const detail = await apiService.purchaseInvoices.getDetail(invoiceNo);
+      if (detail) {
+        setInvoiceHeader({
+          invoiceNo: detail.invoiceNo,
+          date: detail.date?.split('T')[0],
+          deliveryDate: detail.deliveryDate?.split('T')[0],
+          customerCode: detail.customerCode,
+          customerName: detail.customerName,
+          type: detail.type || 'YURT İÇİ',
+          description: detail.description || ''
+        });
+        setItems(detail.items || []);
+        setIsEditMode(true);
+        setActiveTab('header');
+      }
+    } catch (error) {
+      console.error('Detail fetch error:', error);
+      alert('Detaylar alınırken hata oluştu.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   // Check if editing is allowed (Only on the same day)
-  const canEdit = invoiceHeader.date === today;
+  const canEdit = invoiceHeader.date === today || isEditMode;
 
   const handleDateChange = (val: string) => {
     setInvoiceHeader(prev => ({
@@ -152,6 +200,7 @@ const PurchaseInvoice: React.FC = () => {
       description: ''
     });
     setItems([]);
+    setIsEditMode(false);
     setActiveTab('header');
   };
 
@@ -174,6 +223,7 @@ const PurchaseInvoice: React.FC = () => {
 
     setIsSaving(true);
     try {
+      // If in edit mode, we might want to handle it specifically if the backend requires
       const payload = {
         ...invoiceHeader,
         items: items
@@ -181,17 +231,8 @@ const PurchaseInvoice: React.FC = () => {
       const result = await apiService.purchaseInvoices.save(payload);
       if (result.success) {
         alert('Alış irsaliyesi başarıyla kaydedildi.');
-        // Reset form
-        setInvoiceHeader({
-          invoiceNo: '',
-          date: today,
-          deliveryDate: today,
-          customerCode: '',
-          customerName: '',
-          type: 'YURT İÇİ',
-          description: ''
-        });
-        setItems([]);
+        handleNew();
+        if (activeTab === 'history') fetchHistory();
       }
     } catch (error) {
       console.error('Save error:', error);
@@ -274,10 +315,74 @@ const PurchaseInvoice: React.FC = () => {
         >
           <Layers size={16} /> DETAY SATIRLARI
         </button>
+        <button 
+          onClick={() => setActiveTab('history')}
+          className={`flex items-center gap-3 px-8 py-3 rounded-xl text-xs font-black transition-all ${activeTab === 'history' ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-100' : 'text-slate-400 hover:text-slate-600'}`}
+        >
+          <FileSpreadsheet size={16} /> GEÇMİŞ İRSALİYELER
+        </button>
       </div>
 
       {/* TAB CONTENT */}
-      {activeTab === 'header' ? (
+      {activeTab === 'history' ? (
+        <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden animate-in fade-in duration-500">
+          <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+            <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest">Geçmiş Alış İrsaliyeleri</h3>
+            <button 
+              onClick={fetchHistory}
+              className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
+            >
+              <RefreshCcw size={18} className={isHistoryLoading ? 'animate-spin' : ''} />
+            </button>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-slate-50/50 border-b border-slate-200">
+                  <th className="px-6 py-4 text-[11px] font-black text-slate-400 uppercase tracking-widest">İrsaliye No</th>
+                  <th className="px-6 py-4 text-[11px] font-black text-slate-400 uppercase tracking-widest">Tarih</th>
+                  <th className="px-6 py-4 text-[11px] font-black text-slate-400 uppercase tracking-widest">Tedarikçi</th>
+                  <th className="px-6 py-4 text-[11px] font-black text-slate-400 uppercase tracking-widest text-right">Toplam Tutar</th>
+                  <th className="px-6 py-4 text-right w-16"></th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {isHistoryLoading ? (
+                  <tr>
+                    <td colSpan={5} className="px-6 py-12 text-center">
+                      <Loader2 className="animate-spin text-emerald-600 mx-auto" size={24} />
+                    </td>
+                  </tr>
+                ) : history.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="px-6 py-12 text-center text-slate-400 italic">Kayıt bulunamadı.</td>
+                  </tr>
+                ) : (
+                  history.map((inv) => (
+                    <tr key={inv.invoiceNo} className="hover:bg-emerald-50/20 transition-all group">
+                      <td className="px-6 py-4 font-mono font-black text-emerald-600 text-sm">{inv.invoiceNo}</td>
+                      <td className="px-6 py-4 text-xs font-bold text-slate-600">{new Date(inv.date).toLocaleDateString('tr-TR')}</td>
+                      <td className="px-6 py-4">
+                        <p className="text-sm font-black text-slate-800 leading-none mb-1 uppercase">{inv.customerName}</p>
+                        <p className="text-[10px] text-slate-400 font-bold uppercase">{inv.customerCode}</p>
+                      </td>
+                      <td className="px-6 py-4 text-right font-black text-slate-800 text-sm">₺{inv.totalAmount?.toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
+                      <td className="px-6 py-4 text-right">
+                        <button 
+                          onClick={() => handleViewDetail(inv.invoiceNo)}
+                          className="p-2 text-emerald-600 hover:bg-emerald-100 rounded-lg transition-all"
+                        >
+                          <ArrowRight size={18} />
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ) : activeTab === 'header' ? (
         <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 animate-in slide-in-from-left-4 duration-500">
           <div className="xl:col-span-5 space-y-6">
              <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm space-y-8">

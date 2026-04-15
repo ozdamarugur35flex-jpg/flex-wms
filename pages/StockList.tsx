@@ -35,15 +35,16 @@ const StockList: React.FC = () => {
     const dataToExport = filteredStocks.map(stock => ({
       'Stok Kodu': stock.code,
       'Stok Adı': stock.name,
+      'Kod 1': stock.kod1,
       'Barkod 1': stock.barcode1,
       'Barkod 2': stock.barcode2,
       'Barkod 3': stock.barcode3,
       'Birim': stock.unit1,
       'Grup Kodu': stock.groupCode,
-      'Miktar': stock.quantity,
       'Min. Stok': stock.minStockLevel,
       'KDV (%)': stock.purchaseVat,
-      'Son Alış Fiyatı': stock.lastPurchasePrice
+      'Son Alış Fiyatı': stock.lastPurchasePrice,
+      'Alış Yılı': stock.lastPurchaseYear
     }));
 
     const worksheet = XLSX.utils.json_to_sheet(dataToExport);
@@ -157,12 +158,6 @@ const StockList: React.FC = () => {
           >
             <FileSpreadsheet size={18} /> Excel'e Aktar
           </button>
-          <button 
-            onClick={() => handleOpenModal()}
-            className="flex items-center gap-2 px-6 py-3 bg-indigo-600 text-white rounded-2xl text-xs font-black hover:bg-indigo-700 transition-all shadow-lg active:scale-95"
-          >
-            <Plus size={18} /> Yeni Stok
-          </button>
           <button onClick={loadStocks} className="p-3 bg-white border border-slate-200 text-slate-600 rounded-2xl hover:bg-slate-50">
             <RotateCcw size={18} className={loading ? 'animate-spin' : ''} />
           </button>
@@ -195,18 +190,15 @@ const StockList: React.FC = () => {
                   <th className="px-8 py-5 w-48">Barkod Bilgisi</th>
                   <th className="px-8 py-5 text-center">Birim</th>
                   <th className="px-8 py-5 text-center">Kilit</th>
-                  <th className="px-8 py-5 text-right">Mevcut Bakiye</th>
                   <th className="px-8 py-5 text-right">Alış Fiyatı</th>
                   <th className="px-8 py-5 text-right">Satış Fiyatı</th>
-                  <th className="px-8 py-5 text-right w-16"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {filteredStocks.map((stock, index) => (
                   <tr 
                     key={stock.code || stock.id || index} 
-                    onClick={() => handleOpenModal(stock)}
-                    className="hover:bg-indigo-50/20 transition-all group cursor-pointer"
+                    className="hover:bg-indigo-50/20 transition-all group"
                   >
                     <td className="px-8 py-6">
                       <div className="flex items-center gap-4">
@@ -248,11 +240,6 @@ const StockList: React.FC = () => {
                       {stock.isLocked ? <Lock size={16} className="text-rose-500 mx-auto" /> : <Unlock size={16} className="text-emerald-500 mx-auto" />}
                     </td>
                     <td className="px-8 py-6 text-right">
-                       <span className={`text-lg font-black tracking-tighter ${(Number(stock.quantity) || 0) < (Number(stock.minStockLevel) || 0) ? 'text-rose-600' : 'text-slate-800'}`}>
-                        {(Number(stock.quantity) || 0).toLocaleString()}
-                       </span>
-                    </td>
-                    <td className="px-8 py-6 text-right">
                       <div className="flex flex-col items-end">
                         <span className="text-sm font-black text-slate-600">₺{(Number(stock.lastPurchasePrice) || 0).toFixed(2)}</span>
                         {stock.lastPurchaseYear && (
@@ -262,11 +249,6 @@ const StockList: React.FC = () => {
                     </td>
                     <td className="px-8 py-6 text-right">
                       <span className="text-sm font-black text-indigo-600">₺{(Number(stock.salesPrice1) || 0).toFixed(2)}</span>
-                    </td>
-                    <td className="px-8 py-6 text-right">
-                      <button className="p-2 text-slate-300 hover:text-indigo-600 transition-colors opacity-0 group-hover:opacity-100">
-                        <Edit2 size={20} />
-                      </button>
                     </td>
                   </tr>
                 ))}
