@@ -38,7 +38,7 @@ namespace tuckapi.Controllers
                         RTRIM(S.STHAR_KOD2) as DocumentPath
                     FROM TBLSTHAR S WITH (NOLOCK)
                     LEFT JOIN TBLSTSABIT ST WITH (NOLOCK) ON ST.STOK_KODU = S.STOK_KODU
-                    WHERE S.STHAR_FTIRSIP = '1' AND S.STHAR_HTUR IN ('A', 'U')
+                    WHERE S.STHAR_FTIRSIP = '5' AND S.STHAR_HTUR IN ('A', 'U')
                     ORDER BY S.STHAR_TARIH DESC";
 
                 var movements = await conn.QueryAsync(sql);
@@ -94,22 +94,52 @@ namespace tuckapi.Controllers
             try
             {
                 string gckod = request.Type == "Giriş" ? "G" : "C";
+                // Netsis standartlarına uygun Ambar Fişi numarası
                 string fisNo = (request.Type == "Giriş" ? "AG" : "AC") + DateTime.Now.ToString("yyyyMMddHHmm");
 
-                string sql = @"
+                // 1. TBLFATUIRS (BAŞLIK) KAYDI
+                // Önce başlık var mı kontrol edelim (aynı dakikada birden fazla kayıt gelirse)
+                var headerExists = await conn.QueryFirstOrDefaultAsync<int>(
+                    "SELECT COUNT(1) FROM TBLFATUIRS WHERE FATIRS_NO = @SlipNo AND FTIRSIP = '5'",
+                    new { SlipNo = fisNo }, transaction);
+
+                if (headerExists == 0)
+                {
+                    string sqlHeader = @"
+                        INSERT INTO TBLFATUIRS (
+                            SUBE_KODU, FTIRSIP, FATIRS_NO, CARI_KODU, TARIH, TIPI, 
+                            ISLETME_KODU, KAYITTARIHI, KAYITYAPANKUL, C_YEDEK6, YEDEK,
+                            KDV_DAHILMI, SIPARIS_TEST, FIYATTARIHI, ODEMEGUNU, FATKALEM_ADEDI
+                        ) VALUES (
+                            0, '5', @SlipNo, '000000000000000', GETDATE(), 0,
+                            1, GETDATE(), 'FLEX_API', 'M', 'D',
+                            'E', GETDATE(), GETDATE(), 0, 1
+                        )";
+                    await conn.ExecuteAsync(sqlHeader, new { SlipNo = fisNo }, transaction);
+                }
+                else
+                {
+                    // Başlık varsa kalem adedini artır
+                    await conn.ExecuteAsync(
+                        "UPDATE TBLFATUIRS SET FATKALEM_ADEDI = FATKALEM_ADEDI + 1 WHERE FATIRS_NO = @SlipNo AND FTIRSIP = '5'",
+                        new { SlipNo = fisNo }, transaction);
+                }
+
+                // 2. TBLSTHAR (KALEM) KAYDI
+                string sqlLine = @"
                     INSERT INTO TBLSTHAR (
                         SUBE_KODU, FISNO, STOK_KODU, STHAR_TARIH, STHAR_GCMIK, 
                         STHAR_GCMIK2, STHAR_GCKOD, STHAR_HTUR, STHAR_FTIRSIP,
-                        DEPO_KODU, STHAR_ACIKLAMA, STHAR_KOD2,
-                        KAYITTARIHI, KAYITYAPANKUL
+                        DEPO_KODU, STHAR_ACIKLAMA, STHAR_KOD2, STHAR_BGTIP,
+                        SIRA, STHAR_KOD1, KAYITTARIHI, KAYITYAPANKUL, DUZELTMETARIHI
                     ) VALUES (
                         0, @SlipNo, @StockCode, GETDATE(), @Quantity,
-                        @Quantity, @GCKod, 'A', '1',
-                        @WarehouseCode, @Notes, @DocumentPath,
-                        GETDATE(), 'FLEX_API'
+                        @Quantity, @GCKod, 'A', '5',
+                        @WarehouseCode, @Notes, @DocumentPath, 'I',
+                        1, 'M', GETDATE(), 'FLEX_API', GETDATE()
                     )";
 
-                await conn.ExecuteAsync(sql, new {
+                await conn.ExecuteAsync(sqlLine, new {
                     SlipNo = fisNo,
                     request.StockCode,
                     request.Quantity,
