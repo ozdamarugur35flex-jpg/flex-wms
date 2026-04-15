@@ -36,7 +36,7 @@ import PurchaseInvoice from './pages/PurchaseInvoice';
 import SalesInvoicePage from './pages/SalesInvoice';
 import ShipmentOrderEntry from './pages/ShipmentOrderEntry';
 import StockMovementRecord from './pages/StockMovementRecord';
-import ProductionRecordPage from './pages/ProductionRecord';
+import WarehouseEntryExit from './pages/WarehouseEntryExit';
 import WarehouseTransfer from './pages/WarehouseTransfer';
 import WarehouseReset from './pages/WarehouseReset';
 import UserDefinitionPage from './pages/UserDefinition';
@@ -324,7 +324,7 @@ const AppContent: React.FC = () => {
             <Route path="/satis-irsaliye" element={<SalesInvoicePage />} />
             <Route path="/sevk-emri-giris" element={<ShipmentOrderEntry />} />
             <Route path="/stok-hareket" element={<StockMovementRecord />} />
-            <Route path="/uretim-kayit" element={<ProductionRecordPage />} />
+            <Route path="/uretim-kayit" element={<WarehouseEntryExit />} />
             <Route path="/depolar-arasi" element={<WarehouseTransfer />} />
             <Route path="/stok-sifirlama" element={<WarehouseReset />} />
             <Route path="/excel-workspace" element={<SpreadsheetModule />} />

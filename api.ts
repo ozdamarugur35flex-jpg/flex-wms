@@ -453,9 +453,8 @@ export const apiService = {
       }, []),
   },
   production: {
-    getAll: () => request(`${API_BASE_URL}/production`, undefined, []),
-    getMaterialStatus: (jobOrderNo: string) => request(`${API_BASE_URL}/production/material-status/${jobOrderNo}`, undefined, []),
-    save: (data: any) => request(`${API_BASE_URL}/production`, {
+    getAll: () => request(`${API_BASE_URL}/warehouse`, undefined, []),
+    save: (data: any) => request(`${API_BASE_URL}/warehouse`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)

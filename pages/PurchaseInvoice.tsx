@@ -39,6 +39,7 @@ const PurchaseInvoice: React.FC = () => {
   const [stocks, setStocks] = useState<StockCard[]>([]);
   const [customers, setCustomers] = useState<CustomerCard[]>([]);
   const [history, setHistory] = useState<any[]>([]);
+  const [historySearch, setHistorySearch] = useState('');
   const [isHistoryLoading, setIsHistoryLoading] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -126,6 +127,16 @@ const PurchaseInvoice: React.FC = () => {
       setIsLoading(false);
     }
   };
+
+  const filteredHistory = useMemo(() => {
+    if (!historySearch) return history;
+    const s = historySearch.toLowerCase();
+    return history.filter(inv => 
+      inv.invoiceNo.toLowerCase().includes(s) ||
+      inv.customerName.toLowerCase().includes(s) ||
+      inv.customerCode.toLowerCase().includes(s)
+    );
+  }, [history, historySearch]);
 
   // Check if editing is allowed (Only on the same day)
   const canEdit = invoiceHeader.date === today || isEditMode;
@@ -326,8 +337,20 @@ const PurchaseInvoice: React.FC = () => {
       {/* TAB CONTENT */}
       {activeTab === 'history' ? (
         <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden animate-in fade-in duration-500">
-          <div className="p-6 border-b border-slate-100 flex items-center justify-between">
-            <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest">Geçmiş Alış İrsaliyeleri</h3>
+          <div className="p-6 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest">Geçmiş Alış İrsaliyeleri</h3>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
+                <input 
+                  type="text"
+                  placeholder="İrsaliye no veya cari ara..."
+                  className="pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:border-emerald-500 w-64 transition-all"
+                  value={historySearch}
+                  onChange={(e) => setHistorySearch(e.target.value)}
+                />
+              </div>
+            </div>
             <button 
               onClick={fetchHistory}
               className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
@@ -353,12 +376,12 @@ const PurchaseInvoice: React.FC = () => {
                       <Loader2 className="animate-spin text-emerald-600 mx-auto" size={24} />
                     </td>
                   </tr>
-                ) : history.length === 0 ? (
+                ) : filteredHistory.length === 0 ? (
                   <tr>
                     <td colSpan={5} className="px-6 py-12 text-center text-slate-400 italic">Kayıt bulunamadı.</td>
                   </tr>
                 ) : (
-                  history.map((inv) => (
+                  filteredHistory.map((inv) => (
                     <tr key={inv.invoiceNo} className="hover:bg-emerald-50/20 transition-all group">
                       <td className="px-6 py-4 font-mono font-black text-emerald-600 text-sm">{inv.invoiceNo}</td>
                       <td className="px-6 py-4 text-xs font-bold text-slate-600">{new Date(inv.date).toLocaleDateString('tr-TR')}</td>

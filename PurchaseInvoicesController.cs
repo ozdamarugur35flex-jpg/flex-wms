@@ -73,6 +73,69 @@ namespace tuckapi.Controllers
             }
         }
 
+        // 2.5 DETAY GETİR (Listeden Seçince Ekranı Dolduran Kısım)
+        [HttpGet("{invoiceNo}")]
+        public async Task<IActionResult> GetDetail(string invoiceNo)
+        {
+            try
+            {
+                using var conn = new SqlConnection(_connStr);
+                
+                // Başlık Bilgisi
+                string sqlHeader = @"
+                    SELECT 
+                        RTRIM(F.FATIRS_NO) as InvoiceNo,
+                        RTRIM(F.CARI_KODU) as CustomerCode,
+                        ISNULL(dbo.TRK(C.CARI_ISIM), '') as CustomerName,
+                        F.TARIH as Date,
+                        F.GENELTOPLAM as TotalAmount,
+                        ISNULL(F.GIB_FATIRS_NO, '') as GibInvoiceNo,
+                        ISNULL(dbo.TRK(F.ACIKLAMA), '') as Description,
+                        F.TIPI as Type,
+                        RTRIM(F.PROJE_KODU) as ProjectCode
+                    FROM TBLFATUIRS F WITH (NOLOCK)
+                    LEFT JOIN TBLCASABIT C WITH (NOLOCK) ON C.CARI_KOD = F.CARI_KODU
+                    WHERE F.FTIRSIP = '4' AND F.FATIRS_NO = @invoiceNo";
+
+                var header = await conn.QueryFirstOrDefaultAsync<dynamic>(sqlHeader, new { invoiceNo });
+                if (header == null) return NotFound(new { message = "İrsaliye bulunamadı." });
+
+                // Satır Bilgileri
+                string sqlItems = @"
+                    SELECT 
+                        RTRIM(H.STOK_KODU) as StockCode,
+                        ISNULL(dbo.TRK(S.STOK_ADI), '') as StockName,
+                        H.STHAR_GCMIK as Quantity,
+                        H.STHAR_NF as Price,
+                        H.STHAR_KDV as Vat,
+                        RTRIM(H.DEPO_KODU) as WarehouseCode,
+                        RTRIM(H.OLCUBR) as Unit
+                    FROM TBLSTHAR H WITH (NOLOCK)
+                    LEFT JOIN TBLSTSABIT S WITH (NOLOCK) ON S.STOK_KODU = H.STOK_KODU
+                    WHERE H.STHAR_FTIRSIP = '4' AND H.FISNO = @invoiceNo";
+
+                var items = await conn.QueryAsync<dynamic>(sqlItems, new { invoiceNo });
+
+                return Ok(new
+                {
+                    header.InvoiceNo,
+                    header.CustomerCode,
+                    header.CustomerName,
+                    header.Date,
+                    header.TotalAmount,
+                    header.GibInvoiceNo,
+                    header.Description,
+                    header.ProjectCode,
+                    Type = header.Type == 2 ? "YURT İÇİ" : "YURT DIŞI",
+                    Items = items
+                });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = "Hata: " + ex.Message });
+            }
+        }
+
         // 3. KAYDETME
         [HttpPost]
         public async Task<IActionResult> Create([FromBody] PurchaseInvoiceRequest request)
