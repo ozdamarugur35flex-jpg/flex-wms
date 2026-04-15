@@ -32,7 +32,8 @@ namespace tuckapi.Controllers
                         F.TARIH as Date,
                         F.GENELTOPLAM as TotalAmount,
                         F.GIB_FATIRS_NO as GibInvoiceNo,
-                        ISNULL(F.ACIKLAMA, '') as Description
+                        ISNULL(F.ACIKLAMA, '') as Description,
+                        ISNULL(F.KOD1, '') as SpecialCode1
                     FROM TBLFATUIRS F
                     LEFT JOIN TBLCASABIT C ON C.CARI_KOD = F.CARI_KODU
                     WHERE F.FTIRSIP IN ('1', '3')

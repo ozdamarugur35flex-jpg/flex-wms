@@ -1,37 +1,19 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
-  Factory, 
   Plus, 
   Save, 
   Trash2, 
   Printer, 
-  FileSpreadsheet, 
-  XCircle, 
-  Calendar, 
-  Box, 
-  Layers, 
   Warehouse as WarehouseIcon, 
-  Settings, 
-  Info, 
-  ArrowRightLeft, 
-  CheckCircle2, 
-  AlertTriangle,
   History,
   LayoutGrid,
-  Search,
-  BadgeAlert,
-  ArrowDownCircle,
-  ArrowUpCircle,
-  Hash,
-  Tag,
-  MoreHorizontal,
   Loader2,
   FileText,
   Upload,
   Check
 } from 'lucide-react';
-import { ProductionRecord, DepotMaterialStatus, StockCard } from '../types';
+import { StockCard } from '../types';
 import { apiService } from '../api';
 import SearchableSelect from '../components/SearchableSelect';
 
@@ -82,7 +64,7 @@ const WarehouseEntryExitPage: React.FC = () => {
       id: Math.random().toString(36).substr(2, 9),
       ...form,
       stockName: stock?.name || '',
-      unit: stock?.unit || 'ADET'
+      unit: stock?.unit1 || 'ADET'
     };
 
     setTempItems(prev => [...prev, newItem]);
@@ -125,21 +107,27 @@ const WarehouseEntryExitPage: React.FC = () => {
 
     setIsSaving(true);
     try {
-      // In a real app, we would upload the file first, then save the records
-      // For now, we simulate the API call
+      // 1. Upload the file first
+      const uploadRes = await apiService.production.upload(uploadedFile);
+      if (!uploadRes.success) {
+        throw new Error("Dosya yüklenemedi");
+      }
+
+      const documentPath = uploadRes.filePath;
+
+      // 2. Save each item with the document path
       for (const item of tempItems) {
         await apiService.production.save({
           stockCode: item.stockCode,
           quantity: item.quantity,
           warehouseCode: parseInt(item.warehouse),
-          machine: 'DEPO', // Defaulted
-          operator: 'DEPO_USER', // Defaulted
-          jobOrderNo: 'AMBAR_HAREKET', // Defaulted
-          serialNo: item.notes // Using notes as serial or description in backend
+          type: item.type,
+          notes: item.notes,
+          documentPath: documentPath
         });
       }
       
-      alert("Stok hareketleri başarıyla resmileştirildi ve form arşive alındı.");
+      alert("Stok hareketleri başarıyla resmileştirildi ve form C:\\DEPOTESLUMTESELLUM konumuna kaydedildi.");
       setTempItems([]);
       setForm({
         stockCode: '',
@@ -150,13 +138,35 @@ const WarehouseEntryExitPage: React.FC = () => {
       });
       setIsPrinted(false);
       setUploadedFile(null);
+      fetchHistory(); // Refresh history
     } catch (error) {
       console.error("Kaydetme hatası:", error);
-      alert("Kaydetme sırasında bir hata oluştu.");
+      alert("Kaydetme sırasında bir hata oluştu. Lütfen tüm alanların dolu olduğundan emin olun.");
     } finally {
       setIsSaving(false);
     }
   };
+
+  const [history, setHistory] = useState<any[]>([]);
+  const [isHistoryLoading, setIsHistoryLoading] = useState(false);
+
+  const fetchHistory = async () => {
+    setIsHistoryLoading(true);
+    try {
+      const data = await apiService.production.getAll();
+      setHistory(data || []);
+    } catch (error) {
+      console.error("Geçmiş yüklenemedi", error);
+    } finally {
+      setIsHistoryLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'history') {
+      fetchHistory();
+    }
+  }, [activeTab]);
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
@@ -164,7 +174,7 @@ const WarehouseEntryExitPage: React.FC = () => {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-3 rounded-2xl border border-slate-200 shadow-sm">
         <div className="flex items-center gap-2">
           <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-indigo-100">
-            <Factory size={24} />
+            <WarehouseIcon size={24} />
           </div>
           <div>
             <h1 className="text-lg font-black text-slate-800 tracking-tight">Ambar Giriş Çıkış</h1>
@@ -173,211 +183,346 @@ const WarehouseEntryExitPage: React.FC = () => {
         </div>
         
         <div className="flex items-center gap-2">
-          <button 
-            onClick={handlePrint}
-            disabled={tempItems.length === 0}
-            className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-600 rounded-xl text-xs font-bold hover:bg-slate-50 transition-all active:scale-95 disabled:opacity-50"
-          >
-            <Printer size={16} className="text-indigo-600" /> Yazdır ve Hazırla
-          </button>
-          
-          <div className="relative">
-            <input 
-              type="file" 
-              id="file-upload" 
-              className="hidden" 
-              onChange={handleFileUpload}
-              accept="image/*,application/pdf"
-              disabled={!isPrinted}
-            />
-            <label 
-              htmlFor="file-upload"
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer active:scale-95 ${uploadedFile ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' : isPrinted ? 'bg-amber-500 text-white shadow-lg shadow-amber-100 hover:bg-amber-600' : 'bg-slate-100 text-slate-400 cursor-not-allowed'}`}
+          <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200 mr-4">
+            <button 
+              onClick={() => setActiveTab('entry')}
+              className={`px-6 py-2 rounded-lg text-[10px] font-black transition-all ${activeTab === 'entry' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
             >
-              {uploadedFile ? <Check size={16} /> : <Upload size={16} />}
-              {uploadedFile ? 'Form Yüklendi' : 'İmzalı Formu Yükle'}
-            </label>
+              YENİ İŞLEM
+            </button>
+            <button 
+              onClick={() => setActiveTab('history')}
+              className={`px-6 py-2 rounded-lg text-[10px] font-black transition-all ${activeTab === 'history' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+            >
+              GEÇMİŞ HAREKETLER
+            </button>
           </div>
 
-          <button 
-            onClick={handleSave}
-            disabled={!uploadedFile || isSaving}
-            className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-xl text-xs font-black shadow-lg shadow-emerald-100 hover:bg-emerald-700 transition-all active:scale-95 disabled:opacity-50"
-          >
-            {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save size={16} />}
-            Kaydet & Resmileştir
-          </button>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 xl:grid-cols-12 gap-8">
-        {/* FORM SECTION */}
-        <div className="xl:col-span-4 space-y-6">
-          <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm space-y-6">
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em]">İşlem Detayları</h3>
-              <div className="flex p-1 bg-slate-100 rounded-xl border border-slate-200">
-                <button 
-                  onClick={() => setForm(prev => ({ ...prev, type: 'Giriş' }))}
-                  className={`px-4 py-1.5 rounded-lg text-[10px] font-black transition-all ${form.type === 'Giriş' ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-400 hover:text-slate-600'}`}
-                >
-                  GİRİŞ
-                </button>
-                <button 
-                  onClick={() => setForm(prev => ({ ...prev, type: 'Çıkış' }))}
-                  className={`px-4 py-1.5 rounded-lg text-[10px] font-black transition-all ${form.type === 'Çıkış' ? 'bg-rose-600 text-white shadow-md' : 'text-slate-400 hover:text-slate-600'}`}
-                >
-                  ÇIKIŞ
-                </button>
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              <SearchableSelect 
-                label="Stok Seçimi"
-                placeholder="Stok Ara..."
-                value={form.stockCode}
-                onChange={(val) => setForm(prev => ({ ...prev, stockCode: val }))}
-                options={stocks.map(s => ({ value: s.code, label: `${s.code} | ${s.name}` }))}
-              />
-
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">İşlem Miktarı</label>
-                <div className="relative">
-                  <input 
-                    type="number" 
-                    className="w-full px-5 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-black outline-none focus:border-indigo-500"
-                    value={form.quantity}
-                    onChange={(e) => setForm(prev => ({ ...prev, quantity: parseFloat(e.target.value) || 0 }))}
-                  />
-                  <div className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] font-black text-slate-400 uppercase">
-                    {stocks.find(s => s.code === form.stockCode)?.unit || 'ADET'}
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center justify-between">
-                  <span>İşlem Notu (Zorunlu)</span>
-                  {form.notes.trim() === '' && <span className="text-[9px] text-rose-500 font-bold animate-pulse">NOT GEREKLİ</span>}
-                </label>
-                <textarea 
-                  rows={4}
-                  className="w-full px-5 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-medium outline-none focus:bg-white focus:border-indigo-500 transition-all"
-                  placeholder="İşlemin detaylarını buraya yazınız..."
-                  value={form.notes}
-                  onChange={(e) => setForm(prev => ({ ...prev, notes: e.target.value }))}
+          {activeTab === 'entry' && (
+            <>
+              <button 
+                onClick={handlePrint}
+                disabled={tempItems.length === 0}
+                className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-600 rounded-xl text-xs font-bold hover:bg-slate-50 transition-all active:scale-95 disabled:opacity-50"
+              >
+                <Printer size={16} className="text-indigo-600" /> Yazdır ve Hazırla
+              </button>
+              
+              <div className="relative">
+                <input 
+                  type="file" 
+                  id="file-upload" 
+                  className="hidden" 
+                  onChange={handleFileUpload}
+                  accept="image/*,application/pdf"
+                  disabled={!isPrinted}
                 />
+                <label 
+                  htmlFor="file-upload"
+                  className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer active:scale-95 ${uploadedFile ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' : isPrinted ? 'bg-amber-500 text-white shadow-lg shadow-amber-100 hover:bg-amber-600' : 'bg-slate-100 text-slate-400 cursor-not-allowed'}`}
+                >
+                  {uploadedFile ? <Check size={16} /> : <Upload size={16} />}
+                  {uploadedFile ? 'Form Yüklendi' : 'İmzalı Formu Yükle'}
+                </label>
               </div>
 
               <button 
-                onClick={handleAddToList}
-                className="w-full py-4 bg-slate-900 text-white rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-slate-800 transition-all active:scale-95 flex items-center justify-center gap-2"
+                onClick={handleSave}
+                disabled={!uploadedFile || isSaving}
+                className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-xl text-xs font-black shadow-lg shadow-emerald-100 hover:bg-emerald-700 transition-all active:scale-95 disabled:opacity-50"
               >
-                <Plus size={16} /> Listeye Ekle
+                {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save size={16} />}
+                Kaydet & Resmileştir
               </button>
-            </div>
-          </div>
-
-          {!isPrinted && tempItems.length > 0 && (
-            <div className="bg-amber-50 border border-amber-100 p-6 rounded-[2rem] flex items-start gap-4 animate-bounce">
-              <div className="w-10 h-10 bg-amber-100 rounded-2xl flex items-center justify-center text-amber-600 shrink-0">
-                <Printer size={20} />
-              </div>
-              <div>
-                <h4 className="text-xs font-black text-amber-800 uppercase tracking-widest mb-1">Sıradaki Adım</h4>
-                <p className="text-[11px] text-amber-700 font-medium leading-relaxed">Listeniz hazır. Lütfen yukarıdaki "Yazdır ve Hazırla" butonuna basarak formu yazdırınız.</p>
-              </div>
-            </div>
+            </>
           )}
         </div>
+      </div>
 
-        {/* LIST SECTION */}
-        <div className="xl:col-span-8 space-y-6">
-          <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden flex flex-col min-h-[500px]">
-            <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/30">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 bg-indigo-50 rounded-lg flex items-center justify-center text-indigo-600">
-                  <FileText size={18} />
+      {activeTab === 'entry' ? (
+        <div className="grid grid-cols-1 xl:grid-cols-12 gap-8">
+          {/* FORM SECTION */}
+          <div className="xl:col-span-4 space-y-6">
+            <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm space-y-6">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em]">İşlem Detayları</h3>
+                <div className="flex p-1 bg-slate-100 rounded-xl border border-slate-200">
+                  <button 
+                    onClick={() => setForm(prev => ({ ...prev, type: 'Giriş' }))}
+                    className={`px-4 py-1.5 rounded-lg text-[10px] font-black transition-all ${form.type === 'Giriş' ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-400 hover:text-slate-600'}`}
+                  >
+                    GİRİŞ
+                  </button>
+                  <button 
+                    onClick={() => setForm(prev => ({ ...prev, type: 'Çıkış' }))}
+                    className={`px-4 py-1.5 rounded-lg text-[10px] font-black transition-all ${form.type === 'Çıkış' ? 'bg-rose-600 text-white shadow-md' : 'text-slate-400 hover:text-slate-600'}`}
+                  >
+                    ÇIKIŞ
+                  </button>
                 </div>
-                <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest">Geçici Hareket Listesi</h3>
               </div>
-              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Toplam {tempItems.length} Kalem</span>
+
+              <div className="space-y-4">
+                <SearchableSelect 
+                  label="Stok Seçimi"
+                  placeholder="Stok Ara..."
+                  value={form.stockCode}
+                  onChange={(val) => setForm(prev => ({ ...prev, stockCode: val }))}
+                  options={stocks.map(s => ({ value: s.code, label: `${s.code} | ${s.name}` }))}
+                />
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">İşlem Miktarı</label>
+                  <div className="relative">
+                    <input 
+                      type="number" 
+                      className="w-full px-5 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-black outline-none focus:border-indigo-500"
+                      value={form.quantity}
+                      onChange={(e) => setForm(prev => ({ ...prev, quantity: parseFloat(e.target.value) || 0 }))}
+                    />
+                    <div className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] font-black text-slate-400 uppercase">
+                      {stocks.find(s => s.code === form.stockCode)?.unit1 || 'ADET'}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center justify-between">
+                    <span>İşlem Notu (Zorunlu)</span>
+                    {form.notes.trim() === '' && <span className="text-[9px] text-rose-500 font-bold animate-pulse">NOT GEREKLİ</span>}
+                  </label>
+                  <textarea 
+                    rows={4}
+                    className="w-full px-5 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-medium outline-none focus:bg-white focus:border-indigo-500 transition-all"
+                    placeholder="İşlemin detaylarını buraya yazınız..."
+                    value={form.notes}
+                    onChange={(e) => setForm(prev => ({ ...prev, notes: e.target.value }))}
+                  />
+                </div>
+
+                <button 
+                  onClick={handleAddToList}
+                  className="w-full py-4 bg-slate-900 text-white rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-slate-800 transition-all active:scale-95 flex items-center justify-center gap-2"
+                >
+                  <Plus size={16} /> Listeye Ekle
+                </button>
+              </div>
             </div>
 
-            <div className="flex-1 overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-slate-50/50 border-b border-slate-100">
-                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Tip</th>
-                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Stok Bilgisi</th>
-                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Miktar</th>
-                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Notlar</th>
-                    <th className="px-6 py-4 text-right w-16"></th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-50">
-                  {tempItems.length === 0 ? (
-                    <tr>
-                      <td colSpan={5} className="px-6 py-20 text-center">
-                        <div className="flex flex-col items-center gap-4 text-slate-300">
-                          <LayoutGrid size={48} strokeWidth={1} />
-                          <p className="text-xs font-black uppercase tracking-widest">Liste Henüz Boş</p>
-                        </div>
-                      </td>
+            {!isPrinted && tempItems.length > 0 && (
+              <div className="bg-amber-50 border border-amber-100 p-6 rounded-[2rem] flex items-start gap-4 animate-bounce">
+                <div className="w-10 h-10 bg-amber-100 rounded-2xl flex items-center justify-center text-amber-600 shrink-0">
+                  <Printer size={20} />
+                </div>
+                <div>
+                  <h4 className="text-xs font-black text-amber-800 uppercase tracking-widest mb-1">Sıradaki Adım</h4>
+                  <p className="text-[11px] text-amber-700 font-medium leading-relaxed">Listeniz hazır. Lütfen yukarıdaki "Yazdır ve Hazırla" butonuna basarak formu yazdırınız.</p>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* LIST SECTION */}
+          <div className="xl:col-span-8 space-y-6">
+            <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden flex flex-col min-h-[500px]">
+              {/* PRINT PREVIEW HEADER (ONLY VISIBLE ON PRINT) */}
+              <div className="hidden print:block p-12 border-b-4 border-slate-900 mb-8">
+                 <div className="flex justify-between items-start">
+                    <div>
+                      <h1 className="text-3xl font-black text-slate-900 uppercase tracking-tighter">
+                        AMBAR {tempItems.some(i => i.type === 'Giriş') ? 'GİRİŞ' : ''} 
+                        {tempItems.some(i => i.type === 'Giriş') && tempItems.some(i => i.type === 'Çıkış') ? ' VE ' : ''}
+                        {tempItems.some(i => i.type === 'Çıkış') ? 'ÇIKIŞ' : ''} TESLİM TESELLÜM FİŞİ
+                      </h1>
+                      <p className="text-sm font-bold text-slate-500 mt-2 uppercase tracking-widest">Döküman No: WH-{new Date().getTime().toString().substr(-6)}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-lg font-black text-slate-900">{new Date().toLocaleDateString('tr-TR')}</p>
+                      <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">İşlem Tarihi</p>
+                    </div>
+                 </div>
+              </div>
+
+              <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/30">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 bg-indigo-50 rounded-lg flex items-center justify-center text-indigo-600">
+                    <FileText size={18} />
+                  </div>
+                  <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest">Geçici Hareket Listesi</h3>
+                </div>
+                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Toplam {tempItems.length} Kalem</span>
+              </div>
+
+              <div className="flex-1 overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="bg-slate-50/50 border-b border-slate-100">
+                      <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Tip</th>
+                      <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Stok Bilgisi</th>
+                      <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Miktar</th>
+                      <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Notlar</th>
+                      <th className="px-6 py-4 text-right w-16"></th>
                     </tr>
-                  ) : (
-                    tempItems.map(item => (
-                      <tr key={item.id} className="hover:bg-slate-50/50 transition-colors group">
-                        <td className="px-6 py-4">
-                          <span className={`px-3 py-1 rounded-lg text-[9px] font-black uppercase border ${item.type === 'Giriş' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-rose-50 text-rose-600 border-rose-100'}`}>
-                            {item.type}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4">
-                          <p className="text-xs font-black text-slate-800">{item.stockCode}</p>
-                          <p className="text-[10px] text-slate-400 font-bold uppercase truncate max-w-[200px]">{item.stockName}</p>
-                        </td>
-                        <td className="px-6 py-4 text-right">
-                          <p className="text-sm font-black text-slate-800">{item.quantity.toLocaleString()}</p>
-                          <p className="text-[9px] text-slate-400 font-bold uppercase">{item.unit}</p>
-                        </td>
-                        <td className="px-6 py-4">
-                          <p className="text-[11px] text-slate-600 font-medium italic line-clamp-2">"{item.notes}"</p>
-                        </td>
-                        <td className="px-6 py-4 text-right">
-                          <button 
-                            onClick={() => handleRemoveFromList(item.id)}
-                            className="p-2 text-slate-300 hover:text-rose-500 transition-colors"
-                          >
-                            <Trash2 size={18} />
-                          </button>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50">
+                    {tempItems.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="px-6 py-20 text-center">
+                          <div className="flex flex-col items-center gap-4 text-slate-300">
+                            <LayoutGrid size={48} strokeWidth={1} />
+                            <p className="text-xs font-black uppercase tracking-widest">Liste Henüz Boş</p>
+                          </div>
                         </td>
                       </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
+                    ) : (
+                      tempItems.map(item => (
+                        <tr key={item.id} className="hover:bg-slate-50/50 transition-colors group">
+                          <td className="px-6 py-4">
+                            <span className={`px-3 py-1 rounded-lg text-[9px] font-black uppercase border ${item.type === 'Giriş' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-rose-50 text-rose-600 border-rose-100'}`}>
+                              {item.type}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4">
+                            <p className="text-xs font-black text-slate-800">{item.stockCode}</p>
+                            <p className="text-[10px] text-slate-400 font-bold uppercase truncate max-w-[200px]">{item.stockName}</p>
+                          </td>
+                          <td className="px-6 py-4 text-right">
+                            <p className="text-sm font-black text-slate-800">{item.quantity.toLocaleString()}</p>
+                            <p className="text-[9px] text-slate-400 font-bold uppercase">{item.unit}</p>
+                          </td>
+                          <td className="px-6 py-4">
+                            <p className="text-[11px] text-slate-600 font-medium italic line-clamp-2">"{item.notes}"</p>
+                          </td>
+                          <td className="px-6 py-4 text-right">
+                            <button 
+                              onClick={() => handleRemoveFromList(item.id)}
+                              className="p-2 text-slate-300 hover:text-rose-500 transition-colors"
+                            >
+                              <Trash2 size={18} />
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
 
-            {/* PRINT PREVIEW FOOTER (ONLY VISIBLE ON PRINT) */}
-            <div className="hidden print:block p-12 border-t-4 border-slate-900 mt-auto">
-               <div className="grid grid-cols-2 gap-20">
-                  <div className="text-center space-y-12">
-                     <p className="text-sm font-black uppercase tracking-widest border-b-2 border-slate-200 pb-2">Teslim Eden</p>
-                     <div className="h-24" />
-                     <p className="text-xs font-bold text-slate-400">İsim / İmza</p>
-                  </div>
-                  <div className="text-center space-y-12">
-                     <p className="text-sm font-black uppercase tracking-widest border-b-2 border-slate-200 pb-2">Teslim Alan</p>
-                     <div className="h-24" />
-                     <p className="text-xs font-bold text-slate-400">İsim / İmza</p>
-                  </div>
-               </div>
+              {/* PRINT PREVIEW FOOTER (ONLY VISIBLE ON PRINT) */}
+              <div className="hidden print:block p-12 mt-auto">
+                 <div className="bg-slate-50 p-6 rounded-2xl border-2 border-slate-200 mb-12">
+                    <p className="text-sm font-bold text-slate-700 leading-relaxed">
+                      Yukarıda detayları belirtilen mallar, tam, eksiksiz ve hasarsız bir şekilde teslim edilmiş/alınmıştır. 
+                      Bu formun imzalanması ile birlikte ilgili stok hareketleri resmi kayıtlara işlenmek üzere onaylanmış sayılır.
+                    </p>
+                 </div>
+
+                 <div className="grid grid-cols-2 gap-20">
+                    <div className="text-center space-y-12">
+                       <p className="text-sm font-black uppercase tracking-widest border-b-2 border-slate-200 pb-2">Teslim Eden</p>
+                       <div className="h-24 border-2 border-dashed border-slate-100 rounded-xl" />
+                       <p className="text-xs font-bold text-slate-400">İsim / İmza</p>
+                    </div>
+                    <div className="text-center space-y-12">
+                       <p className="text-sm font-black uppercase tracking-widest border-b-2 border-slate-200 pb-2">Teslim Alan</p>
+                       <div className="h-24 border-2 border-dashed border-slate-100 rounded-xl" />
+                       <p className="text-xs font-bold text-slate-400">İsim / İmza</p>
+                    </div>
+                 </div>
+
+                 <div className="mt-20 text-center">
+                    <p className="text-[10px] font-black text-slate-300 uppercase tracking-[0.5em]">FLEX WMS - DİJİTAL ARŞİV SİSTEMİ</p>
+                 </div>
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      ) : (
+        <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden animate-in slide-in-from-right-4 duration-500">
+          <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/30">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 bg-indigo-50 rounded-lg flex items-center justify-center text-indigo-600">
+                <History size={18} />
+              </div>
+              <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest">Geçmiş Ambar Hareketleri</h3>
+            </div>
+            <button 
+              onClick={fetchHistory}
+              className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+            >
+              <Loader2 size={18} className={isHistoryLoading ? 'animate-spin' : ''} />
+            </button>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-slate-50/50 border-b border-slate-200">
+                  <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Tarih / Fiş No</th>
+                  <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Tip</th>
+                  <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Stok Bilgisi</th>
+                  <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Miktar</th>
+                  <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Notlar</th>
+                  <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Evrak</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {isHistoryLoading ? (
+                  <tr>
+                    <td colSpan={6} className="px-6 py-20 text-center">
+                      <Loader2 className="animate-spin text-indigo-600 mx-auto" size={32} />
+                      <p className="text-xs text-slate-400 mt-4 font-bold uppercase">Veriler Yükleniyor...</p>
+                    </td>
+                  </tr>
+                ) : history.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="px-6 py-20 text-center text-slate-300">
+                      <History size={48} strokeWidth={1} className="mx-auto mb-4" />
+                      <p className="text-xs font-black uppercase tracking-widest">Henüz Hareket Kaydı Yok</p>
+                    </td>
+                  </tr>
+                ) : (
+                  history.map((h) => (
+                    <tr key={h.id} className="hover:bg-slate-50 transition-colors">
+                      <td className="px-6 py-4">
+                        <p className="text-xs font-black text-slate-800">{new Date(h.date).toLocaleDateString('tr-TR')}</p>
+                        <p className="text-[10px] text-slate-400 font-bold uppercase">{h.slipNo}</p>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className={`px-3 py-1 rounded-lg text-[9px] font-black uppercase border ${h.type === 'Giriş' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-rose-50 text-rose-600 border-rose-100'}`}>
+                          {h.type}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <p className="text-xs font-black text-slate-800">{h.stockCode}</p>
+                        <p className="text-[10px] text-slate-400 font-bold uppercase truncate max-w-[200px]">{h.stockName}</p>
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <p className="text-sm font-black text-slate-800">{h.quantity?.toLocaleString()}</p>
+                        <p className="text-[9px] text-slate-400 font-bold uppercase">{h.unit}</p>
+                      </td>
+                      <td className="px-6 py-4">
+                        <p className="text-[11px] text-slate-600 font-medium italic line-clamp-1" title={h.notes}>"{h.notes}"</p>
+                      </td>
+                      <td className="px-6 py-4">
+                        {h.documentPath ? (
+                          <div className="flex items-center gap-2">
+                             <div className="w-8 h-8 bg-amber-50 text-amber-600 rounded-lg flex items-center justify-center" title={h.documentPath}>
+                                <FileText size={16} />
+                             </div>
+                             <span className="text-[9px] font-black text-slate-400 uppercase truncate max-w-[100px]">PDF ARŞİVDE</span>
+                          </div>
+                        ) : (
+                          <span className="text-[9px] font-black text-slate-300 uppercase italic">DOSYA YOK</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

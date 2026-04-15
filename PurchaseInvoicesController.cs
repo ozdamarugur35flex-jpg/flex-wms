@@ -92,7 +92,8 @@ namespace tuckapi.Controllers
                         ISNULL(F.GIB_FATIRS_NO, '') as GibInvoiceNo,
                         ISNULL(dbo.TRK(F.ACIKLAMA), '') as Description,
                         F.TIPI as Type,
-                        RTRIM(F.PROJE_KODU) as ProjectCode
+                        RTRIM(F.PROJE_KODU) as ProjectCode,
+                        F.D_YEDEK10 as DeliveryDate
                     FROM TBLFATUIRS F WITH (NOLOCK)
                     LEFT JOIN TBLCASABIT C WITH (NOLOCK) ON C.CARI_KOD = F.CARI_KODU
                     WHERE F.FTIRSIP = '4' AND F.FATIRS_NO = @invoiceNo";
@@ -126,6 +127,7 @@ namespace tuckapi.Controllers
                     header.GibInvoiceNo,
                     header.Description,
                     header.ProjectCode,
+                    header.DeliveryDate,
                     Type = header.Type == 2 ? "YURT İÇİ" : "YURT DIŞI",
                     Items = items
                 });

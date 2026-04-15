@@ -109,8 +109,8 @@ const PurchaseInvoice: React.FC = () => {
       if (detail) {
         setInvoiceHeader({
           invoiceNo: detail.invoiceNo,
-          date: detail.date?.split('T')[0],
-          deliveryDate: detail.deliveryDate?.split('T')[0],
+          date: detail.date?.split('T')[0] || today,
+          deliveryDate: detail.deliveryDate?.split('T')[0] || today,
           customerCode: detail.customerCode,
           customerName: detail.customerName,
           type: detail.type || 'YURT İÇİ',
@@ -198,6 +198,10 @@ const PurchaseInvoice: React.FC = () => {
       price: 0,
       vat: 20
     });
+  };
+
+  const handleRemoveLine = (id: string) => {
+    setItems(prev => prev.filter(item => item.id !== id));
   };
 
   const handleNew = () => {
@@ -671,7 +675,12 @@ const PurchaseInvoice: React.FC = () => {
                                 <p className="text-sm font-black text-emerald-600">₺{item.total.toLocaleString(undefined, {minimumFractionDigits: 2})}</p>
                              </td>
                              <td className="px-6 py-4 text-right">
-                                {canEdit && <button className="p-2 text-slate-300 hover:text-rose-500 transition-colors opacity-0 group-hover:opacity-100"><Trash2 size={16} /></button>}
+                                {canEdit && <button 
+                                     onClick={() => handleRemoveLine(item.id)}
+                                     className="p-2 text-slate-300 hover:text-rose-500 transition-colors opacity-0 group-hover:opacity-100"
+                                   >
+                                     <Trash2 size={16} />
+                                   </button>}
                              </td>
                           </tr>
                        ))}

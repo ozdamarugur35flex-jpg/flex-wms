@@ -169,20 +169,28 @@ const mapPurchaseInvoiceData = (item: any) => {
     customerCode: item.customerCode || item.CustomerCode || '',
     customerName: item.customerName || item.CustomerName || '',
     date: item.date || item.Date || '',
+    deliveryDate: item.deliveryDate || item.DeliveryDate || item.D_YEDEK10 || '',
     totalAmount: Number(item.totalAmount ?? item.TotalAmount ?? 0),
     gibInvoiceNo: item.gibInvoiceNo || item.GibInvoiceNo || '',
     description: item.description || item.Description || '',
-    items: Array.isArray(item.items || item.Items) ? (item.items || item.Items).map((line: any) => ({
-      id: line.id || line.Id || Math.random().toString(36).substr(2, 9),
-      invoiceNo: line.invoiceNo || line.InvoiceNo || '',
-      stockCode: line.stockCode || line.StockCode || '',
-      stockName: line.stockName || line.StockName || '',
-      quantity: Number(line.quantity ?? line.Quantity ?? 0),
-      unit: line.unit || line.Unit || 'ADET',
-      price: Number(line.price ?? line.Price ?? 0),
-      date: line.date || line.Date || '',
-      warehouseCode: Number(line.warehouseCode ?? line.WarehouseCode ?? 0),
-    })) : []
+    items: Array.isArray(item.items || item.Items) ? (item.items || item.Items).map((line: any) => {
+      const quantity = Number(line.quantity ?? line.Quantity ?? 0);
+      const price = Number(line.price ?? line.Price ?? 0);
+      const vat = Number(line.vat ?? line.Vat ?? 0);
+      return {
+        id: line.id || line.Id || Math.random().toString(36).substr(2, 9),
+        invoiceNo: line.invoiceNo || line.InvoiceNo || '',
+        stockCode: line.stockCode || line.StockCode || '',
+        stockName: line.stockName || line.StockName || '',
+        quantity,
+        unit: line.unit || line.Unit || 'ADET',
+        price,
+        vat,
+        total: quantity * price * (1 + vat / 100),
+        date: line.date || line.Date || '',
+        warehouseCode: line.warehouseCode || line.WarehouseCode || '01',
+      };
+    }) : []
   };
 };
 
@@ -197,6 +205,7 @@ const mapSalesInvoiceData = (item: any) => {
     deliveryDate: item.deliveryDate || item.DeliveryDate || '',
     totalAmount: Number(item.totalAmount ?? item.TotalAmount ?? 0),
     projectCode: item.projectCode || item.ProjectCode || '',
+    specialCode1: item.specialCode1 || item.SpecialCode1 || '',
     description: item.description || item.Description || '',
     taxOffice: item.taxOffice || item.TaxOffice || '',
     taxNumber: item.taxNumber || item.TaxNumber || '',
@@ -459,5 +468,20 @@ export const apiService = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
     }, { success: true }),
+    upload: async (file: File) => {
+      const formData = new FormData();
+      formData.append('file', file);
+      try {
+        const response = await fetch(`${API_BASE_URL}/warehouse/upload`, {
+          method: 'POST',
+          body: formData
+        });
+        if (!response.ok) throw new Error('Yükleme başarısız');
+        return await response.json();
+      } catch (error) {
+        console.error('Upload Error:', error);
+        return { success: false };
+      }
+    }
   }
 };

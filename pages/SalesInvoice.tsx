@@ -58,6 +58,7 @@ const SalesInvoicePage: React.FC = () => {
   const [isCustomerDropdownOpen, setIsCustomerDropdownOpen] = useState(false);
   const [stockSearch, setStockSearch] = useState('');
   const [isStockDropdownOpen, setIsStockDropdownOpen] = useState(false);
+  const [merkezFilter, setMerkezFilter] = useState(false);
 
   const filteredCustomers = useMemo(() => {
     if (!customerSearch) return customers;
@@ -69,13 +70,17 @@ const SalesInvoicePage: React.FC = () => {
   }, [customers, customerSearch]);
 
   const filteredStocks = useMemo(() => {
-    if (!stockSearch) return stocks;
+    let result = stocks;
+    if (merkezFilter) {
+      result = result.filter(s => s.kod2 === 'MERKEZ');
+    }
+    if (!stockSearch) return result;
     const lowerSearch = stockSearch.toLowerCase();
-    return stocks.filter(s => 
+    return result.filter(s => 
       s.code.toLowerCase().includes(lowerSearch) || 
       s.name.toLowerCase().includes(lowerSearch)
     );
-  }, [stocks, stockSearch]);
+  }, [stocks, stockSearch, merkezFilter]);
   
   // Header State
   const [invoiceHeader, setInvoiceHeader] = useState<Partial<SalesInvoice>>({
@@ -364,14 +369,18 @@ const SalesInvoicePage: React.FC = () => {
   };
 
   const filteredHistory = useMemo(() => {
-    if (!historySearch) return history;
+    let result = history;
+    if (merkezFilter) {
+      result = result.filter(h => h.specialCode1 === 'MERKEZ');
+    }
+    if (!historySearch) return result;
     const lowerSearch = historySearch.toLowerCase();
-    return history.filter(h => 
+    return result.filter(h => 
       h.invoiceNo.toLowerCase().includes(lowerSearch) || 
       h.customerName.toLowerCase().includes(lowerSearch) ||
       h.customerCode.toLowerCase().includes(lowerSearch)
     );
-  }, [history, historySearch]);
+  }, [history, historySearch, merkezFilter]);
 
   const handleSelectFromHistory = (invoiceNo: string) => {
     handleViewDetail(invoiceNo);
@@ -709,15 +718,27 @@ const SalesInvoicePage: React.FC = () => {
           <div className="p-6 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div className="flex items-center gap-4">
               <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest">Geçmiş İrsaliye Kayıtları</h3>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
-                <input 
-                  type="text"
-                  placeholder="İrsaliye no veya müşteri ara..."
-                  className="pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:border-indigo-500 w-64 transition-all"
-                  value={historySearch}
-                  onChange={(e) => setHistorySearch(e.target.value)}
-                />
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setMerkezFilter(!merkezFilter)}
+                  className={`px-4 py-2 rounded-xl text-[10px] font-black transition-all border ${
+                    merkezFilter 
+                      ? 'bg-amber-600 text-white border-amber-600 shadow-lg shadow-amber-100' 
+                      : 'bg-white text-slate-400 border-slate-200 hover:border-amber-600 hover:text-amber-600'
+                  }`}
+                >
+                  {merkezFilter ? 'MERKEZ FİLTRESİ: AÇIK' : 'MERKEZ FİLTRESİ: KAPALI'}
+                </button>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
+                  <input 
+                    type="text"
+                    placeholder="İrsaliye no veya müşteri ara..."
+                    className="pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:border-indigo-500 w-64 transition-all"
+                    value={historySearch}
+                    onChange={(e) => setHistorySearch(e.target.value)}
+                  />
+                </div>
               </div>
             </div>
             <button 
@@ -1031,7 +1052,19 @@ const SalesInvoicePage: React.FC = () => {
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-end relative z-20">
                  <div className="lg:col-span-5 space-y-2 relative">
                     <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1 flex items-center gap-2">
-                       <Box size={14} className="text-indigo-400" /> Stok Kartı Seçimi
+                        <div className="flex items-center gap-2">
+                           <Box size={14} className="text-indigo-400" /> Stok Kartı Seçimi
+                        </div>
+                        <button
+                          onClick={() => setMerkezFilter(!merkezFilter)}
+                          className={`px-2 py-0.5 rounded-md text-[9px] font-black transition-all border ${
+                            merkezFilter 
+                              ? 'bg-amber-600 text-white border-amber-600' 
+                              : 'bg-slate-800 text-slate-500 border-slate-700 hover:text-amber-400'
+                          }`}
+                        >
+                          MERKEZ
+                        </button>
                     </label>
                     <div className="relative">
                       <input

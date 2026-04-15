@@ -5,6 +5,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using System.IO;
+using Microsoft.AspNetCore.Http;
 
 namespace tuckapi.Controllers
 {
@@ -13,6 +15,7 @@ namespace tuckapi.Controllers
     public class WarehouseController : ControllerBase
     {
         private readonly string _connStr = "Server=.\\TUCKDB;Database=MERACK26;User Id=sa;Password=Pn123@;TrustServerCertificate=True;";
+        private readonly string _uploadPath = @"C:\DEPOTESLUMTESELLUM";
 
         // 1. HAREKET LİSTESİ (GetAll)
         [HttpGet]
@@ -47,7 +50,37 @@ namespace tuckapi.Controllers
             }
         }
 
-        // 2. HAREKET KAYDET (Save)
+        // 2. DOSYA YÜKLEME (Upload)
+        [HttpPost("upload")]
+        public async Task<IActionResult> Upload(IFormFile file)
+        {
+            if (file == null || file.Length == 0)
+                return BadRequest(new { message = "Dosya seçilmedi." });
+
+            try
+            {
+                if (!Directory.Exists(_uploadPath))
+                {
+                    Directory.CreateDirectory(_uploadPath);
+                }
+
+                string fileName = $"WH_{DateTime.Now:yyyyMMddHHmmss}_{file.FileName}";
+                string fullPath = Path.Combine(_uploadPath, fileName);
+
+                using (var stream = new FileStream(fullPath, FileMode.Create))
+                {
+                    await file.CopyToAsync(stream);
+                }
+
+                return Ok(new { success = true, filePath = fullPath, fileName = fileName });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = "Dosya yükleme hatası: " + ex.Message });
+            }
+        }
+
+        // 3. HAREKET KAYDET (Save)
         [HttpPost]
         public async Task<IActionResult> Create([FromBody] WarehouseSaveRequest request)
         {
@@ -99,12 +132,11 @@ namespace tuckapi.Controllers
 
     public class WarehouseSaveRequest
     {
-        public string StockCode { get; set; }
+        public string? StockCode { get; set; }
         public decimal Quantity { get; set; }
         public int WarehouseCode { get; set; }
-        public string Type { get; set; } // Giriş / Çıkış
-        public string Notes { get; set; }
-        public string DocumentPath { get; set; } // İmzalı form yolu
+        public string? Type { get; set; } // Giriş / Çıkış
+        public string? Notes { get; set; }
+        public string? DocumentPath { get; set; } // İmzalı form yolu
     }
-}
 }

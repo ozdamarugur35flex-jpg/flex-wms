@@ -43,7 +43,7 @@ namespace FlexWms.Api.Controllers
                                    END as SON_ALIS_YILI
                                    FROM TBLSTSABIT S WITH(NOLOCK) 
                                    LEFT JOIN TBLSTSABITEK EK WITH(NOLOCK) ON S.STOK_KODU = EK.STOK_KODU
-                                   WHERE S.KOD_2 = 'MERKEZ'";
+                                   WHERE 1=1";
 
                     if (!includeYM)
                     {
