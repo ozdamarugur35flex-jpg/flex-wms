@@ -24,21 +24,23 @@ namespace FlexWms.Api.Controllers
                 {
                     // Tüm alanlar Netsis standartlarına göre çekiliyor
                     string sql = @"SELECT S.STOK_KODU, S.STOK_ADI, S.OLCU_BR1, S.OLCU_BR2, S.OLCU_BR3, S.PAY_1, S.PAYDA_1, 
-                                   S.GRUP_KODU, S.KDV_ORANI, S.SATIS_FIAT1, S.ALIS_FIAT1, S.BARKOD1, S.BARKOD2, S.BARKOD3,
+                                   S.GRUP_KODU, S.KDV_ORANI, S.SATIS_FIAT1 AS SATIS_FIYATI_1, S.ALIS_FIAT1, S.BARKOD1, S.BARKOD2, S.BARKOD3,
                                    S.KOD_1, S.KOD_2, S.KOD_3, S.KOD_4, S.KOD_5, S.MUH_DETAYKODU, S.SATICI_KODU, S.DEPO_KODU,
                                    S.EN, S.BOY, S.GENISLIK, S.GUMRUKTARIFEKODU, S.URETICI_KODU, S.ASGARI_STOK, S.TEMIN_SURESI, S.KILIT, S.SAFKOD,
                                    EK.KULL1N as CEVRIM_SAYISI,
                                    (SELECT TOP 1 STHAR_NF FROM TBLSTHAR WITH(NOLOCK) 
                                     WHERE STOK_KODU = S.STOK_KODU 
-                                    AND GCKOD = 'G' AND STHAR_HTUR = 'A' 
-                                    ORDER BY STHAR_TARIH DESC, STHAR_TESTAR DESC) as SON_ALIS_FIYATI
+                                    AND STHAR_GCKOD = 'G' 
+                                    AND STHAR_NF > 0
+                                    AND FISNO IS NOT NULL AND FISNO <> ''
+                                    ORDER BY STHAR_TARIH DESC, STHAR_TESTAR DESC, INCKEYNO DESC) as SON_ALIS_FIYATI
                                    FROM TBLSTSABIT S WITH(NOLOCK) 
                                    LEFT JOIN TBLSTSABITEK EK WITH(NOLOCK) ON S.STOK_KODU = EK.STOK_KODU
-                                   WHERE S.KOD_2 = 'MERKEZ'";
+                                   WHERE 1=1";
 
                     if (!includeYM)
                     {
-                        sql = sql.Replace("WHERE S.KOD_2 = 'MERKEZ'", "WHERE S.KOD_2 = 'MERKEZ' AND S.GRUP_KODU <> 'YMA'");
+                        sql += " AND S.GRUP_KODU <> 'YMA'";
                     }
 
                     sql += " ORDER BY S.STOK_KODU ASC";
@@ -61,7 +63,7 @@ namespace FlexWms.Api.Controllers
                                 Payda1 = rdr["PAYDA_1"] != DBNull.Value ? Convert.ToDouble(rdr["PAYDA_1"]) : 0,
                                 GroupCode = rdr["GRUP_KODU"]?.ToString().Trim() ?? "",
                                 KdvOrani = rdr["KDV_ORANI"] != DBNull.Value ? Convert.ToDouble(rdr["KDV_ORANI"]) : (double?)null,
-                                SatisFiat1 = rdr["SATIS_FIAT1"] != DBNull.Value ? Convert.ToDouble(rdr["SATIS_FIAT1"]) : 0,
+                                SalesPrice1 = rdr["SATIS_FIYATI_1"] != DBNull.Value ? Convert.ToDouble(rdr["SATIS_FIYATI_1"]) : 0,
                                 AlisFiat1 = rdr["ALIS_FIAT1"] != DBNull.Value ? Convert.ToDouble(rdr["ALIS_FIAT1"]) : 0,
                                 LastPurchasePrice = rdr["SON_ALIS_FIYATI"] != DBNull.Value ? Convert.ToDouble(rdr["SON_ALIS_FIYATI"]) : 0,
                                 CevrimSayisi = rdr["CEVRIM_SAYISI"] != DBNull.Value ? Convert.ToDouble(rdr["CEVRIM_SAYISI"]) : 0,
@@ -105,14 +107,16 @@ namespace FlexWms.Api.Controllers
                 using (SqlConnection conn = new SqlConnection(_connectionString))
                 {
                     string sql = @"SELECT S.STOK_KODU, S.STOK_ADI, S.OLCU_BR1, S.OLCU_BR2, S.OLCU_BR3, S.PAY_1, S.PAYDA_1, 
-                                   S.GRUP_KODU, S.KDV_ORANI, S.SATIS_FIAT1, S.ALIS_FIAT1, S.BARKOD1, S.BARKOD2, S.BARKOD3,
+                                   S.GRUP_KODU, S.KDV_ORANI, S.SATIS_FIAT1 AS SATIS_FIYATI_1, S.ALIS_FIAT1, S.BARKOD1, S.BARKOD2, S.BARKOD3,
                                    S.KOD_1, S.KOD_2, S.KOD_3, S.KOD_4, S.KOD_5, S.MUH_DETAYKODU, S.SATICI_KODU, S.DEPO_KODU,
                                    S.EN, S.BOY, S.GENISLIK, S.GUMRUKTARIFEKODU, S.URETICI_KODU, S.ASGARI_STOK, S.TEMIN_SURESI, S.KILIT, S.SAFKOD,
                                    EK.KULL1N as CEVRIM_SAYISI,
                                    (SELECT TOP 1 STHAR_NF FROM TBLSTHAR WITH(NOLOCK) 
                                     WHERE STOK_KODU = S.STOK_KODU 
-                                    AND GCKOD = 'G' AND STHAR_HTUR = 'A' 
-                                    ORDER BY STHAR_TARIH DESC, STHAR_TESTAR DESC) as SON_ALIS_FIYATI
+                                    AND STHAR_GCKOD = 'G' 
+                                    AND STHAR_NF > 0
+                                    AND FISNO IS NOT NULL AND FISNO <> ''
+                                    ORDER BY STHAR_TARIH DESC, STHAR_TESTAR DESC, INCKEYNO DESC) as SON_ALIS_FIYATI
                                    FROM TBLSTSABIT S WITH(NOLOCK) 
                                    LEFT JOIN TBLSTSABITEK EK WITH(NOLOCK) ON S.STOK_KODU = EK.STOK_KODU
                                    WHERE S.STOK_KODU = @code";
@@ -136,7 +140,7 @@ namespace FlexWms.Api.Controllers
                                 Payda1 = rdr["PAYDA_1"] != DBNull.Value ? Convert.ToDouble(rdr["PAYDA_1"]) : 0,
                                 GroupCode = rdr["GRUP_KODU"]?.ToString().Trim() ?? "",
                                 KdvOrani = rdr["KDV_ORANI"] != DBNull.Value ? Convert.ToDouble(rdr["KDV_ORANI"]) : (double?)null,
-                                SatisFiat1 = rdr["SATIS_FIAT1"] != DBNull.Value ? Convert.ToDouble(rdr["SATIS_FIAT1"]) : 0,
+                                SalesPrice1 = rdr["SATIS_FIYATI_1"] != DBNull.Value ? Convert.ToDouble(rdr["SATIS_FIYATI_1"]) : 0,
                                 AlisFiat1 = rdr["ALIS_FIAT1"] != DBNull.Value ? Convert.ToDouble(rdr["ALIS_FIAT1"]) : 0,
                                 LastPurchasePrice = rdr["SON_ALIS_FIYATI"] != DBNull.Value ? Convert.ToDouble(rdr["SON_ALIS_FIYATI"]) : 0,
                                 CevrimSayisi = rdr["CEVRIM_SAYISI"] != DBNull.Value ? Convert.ToDouble(rdr["CEVRIM_SAYISI"]) : 0,
