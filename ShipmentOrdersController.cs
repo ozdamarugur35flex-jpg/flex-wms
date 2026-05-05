@@ -115,7 +115,7 @@ namespace tuckapi.Controllers
                     WHERE RTRIM(T.FISNO) = RTRIM(@orderNo) 
                     AND T.STHAR_FTIRSIP = '6' 
                     AND (T.STHAR_GCMIK - ISNULL(T.FIRMA_DOVTUT, 0)) > 0
-                    AND (ST.DEPO_KODU = 100 OR ST.STOK_KODU IS NOT NULL) -- Ensure we only show stocks from warehouse 100 if joined
+                    AND (ST.DEPO_KODU = 100 OR ST.STOK_KODU IS NOT NULL) -- Ensure we only show stocks from warehouse 100 if joined" ;
 
                 var result = await conn.QueryAsync(sql, new { orderNo });
                 return Ok(result);

@@ -236,7 +236,6 @@ namespace FlexWms.Api.Controllers
             }
         }
     }
-    }
 
     public class StockCreateDto
     {
