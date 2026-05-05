@@ -312,7 +312,14 @@ export const apiService = {
       request(`${API_BASE_URL}/stocks?includeYM=${includeYM}`, undefined, MOCK_STOCKS, mapStockData),
     
     getMinLevels: () => 
-      request(`${API_BASE_URL}/stocks/min-levels`, undefined, MOCK_STOCKS.filter(s => s.quantity < s.minStockLevel), mapStockData),
+      request(`${API_BASE_URL}/stocks/min-levels`, undefined, MOCK_STOCKS, mapStockData),
+
+    updateMinLevel: (code: string, minLevel: number) =>
+      request(`${API_BASE_URL}/stocks/update-min-level`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code, minLevel })
+      }, { success: true }),
 
     getDetail: (code: string) => 
       request(`${API_BASE_URL}/stocks/${code}`, undefined, null, mapStockData),

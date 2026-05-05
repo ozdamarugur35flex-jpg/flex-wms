@@ -29,6 +29,8 @@ export interface StockCard {
   category?: string;
   lastPurchasePrice?: number;
   lastPurchaseYear?: string;
+  yearlySales?: number;
+  code1?: string;
   producerCode?: string;
   customsCode?: string;
   width?: number;

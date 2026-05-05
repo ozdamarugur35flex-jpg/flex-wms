@@ -115,17 +115,19 @@ namespace FlexWms.Api.Controllers
             {
                 using (SqlConnection conn = new SqlConnection(_connectionString))
                 {
-                    // Şartı biraz esnetiyoruz: Stok kartında depo kodu 100 olanlar VEYA 100 nolu depoda bakiyesi olanlar
-                    string sql = @"SELECT S.STOK_KODU, S.STOK_ADI, S.OLCU_BR1, S.ASGARI_STOK, S.AZAMI_STOK, 
+                    // Depo kodu 100 olan ve ASGARI_STOK değeri girilebilecek tüm stokları getiriyoruz.
+                    // Bakiyesi olsun olmasın tüm kartları kullanıcı görsün ki seviye girebilsin.
+                    // Yıllık çıkış (YILLIK_CIKIS) mevcut yıl içindeki 'C' çıkış hareketlerinin toplamıdır.
+                    string sql = @"SELECT S.STOK_KODU, S.STOK_ADI, S.OLCU_BR1, S.ASGARI_STOK, S.KOD_1,
                                    ISNULL((SELECT SUM(STHAR_GCMIK * (CASE WHEN STHAR_GCKOD = 'G' THEN 1 ELSE -1 END)) 
                                            FROM TBLSTHAR WITH(NOLOCK) 
-                                           WHERE STOK_KODU = S.STOK_KODU AND DEPO_KODU = 100), 0) as MIKTAR
+                                           WHERE STOK_KODU = S.STOK_KODU AND DEPO_KODU = 100), 0) as MIKTAR,
+                                   ISNULL((SELECT SUM(STHAR_GCMIK) 
+                                           FROM TBLSTHAR WITH(NOLOCK) 
+                                           WHERE STOK_KODU = S.STOK_KODU AND DEPO_KODU = 100 AND STHAR_GCKOD = 'C' 
+                                           AND YEAR(STHAR_TARIH) = YEAR(GETDATE())), 0) as YILLIK_CIKIS
                                    FROM TBLSTSABIT S WITH(NOLOCK)
-                                   WHERE S.ASGARI_STOK > 0
-                                   AND (S.DEPO_KODU = 100 OR EXISTS(SELECT 1 FROM TBLSTHAR WHERE STOK_KODU = S.STOK_KODU AND DEPO_KODU = 100))
-                                   AND ISNULL((SELECT SUM(STHAR_GCMIK * (CASE WHEN STHAR_GCKOD = 'G' THEN 1 ELSE -1 END)) 
-                                               FROM TBLSTHAR WITH(NOLOCK) 
-                                               WHERE STOK_KODU = S.STOK_KODU AND DEPO_KODU = 100), 0) < S.ASGARI_STOK
+                                   WHERE S.DEPO_KODU = 100 
                                    ORDER BY S.STOK_KODU ASC";
 
                     SqlCommand cmd = new SqlCommand(sql, conn);
@@ -142,12 +144,42 @@ namespace FlexWms.Api.Controllers
                                 Unit = rdr["OLCU_BR1"].ToString().Trim(),
                                 Quantity = Convert.ToDouble(rdr["MIKTAR"]),
                                 MinStockLevel = Convert.ToDouble(rdr["ASGARI_STOK"]),
-                                MaxStockLevel = Convert.ToDouble(rdr["AZAMI_STOK"])
+                                YearlySales = Convert.ToDouble(rdr["YILLIK_CIKIS"]),
+                                Code1 = rdr["KOD_1"].ToString().Trim()
                             });
                         }
                     }
                 }
                 return Ok(stocks);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"SQL Hatası: {ex.Message}");
+            }
+        }
+
+        [HttpPost("update-min-level")]
+        public IActionResult UpdateMinLevel([FromBody] MinLevelUpdateDto dto)
+        {
+            if (dto == null || string.IsNullOrEmpty(dto.Code))
+                return BadRequest("Stok kodu boş olamaz.");
+
+            try
+            {
+                using (SqlConnection conn = new SqlConnection(_connectionString))
+                {
+                    string sql = "UPDATE TBLSTSABIT SET ASGARI_STOK = @minLevel WHERE STOK_KODU = @code";
+                    SqlCommand cmd = new SqlCommand(sql, conn);
+                    cmd.Parameters.AddWithValue("@minLevel", dto.MinLevel);
+                    cmd.Parameters.AddWithValue("@code", dto.Code);
+                    conn.Open();
+                    int affected = cmd.ExecuteNonQuery();
+
+                    if (affected > 0)
+                        return Ok(new { success = true, message = "Minimum stok seviyesi güncellendi." });
+                    else
+                        return NotFound(new { success = false, message = "Stok bulunamadı." });
+                }
             }
             catch (Exception ex)
             {
@@ -283,6 +315,12 @@ namespace FlexWms.Api.Controllers
                 GC.WaitForPendingFinalizers();
             }
         }
+    }
+
+    public class MinLevelUpdateDto
+    {
+        public string Code { get; set; }
+        public double MinLevel { get; set; }
     }
 
     public class StockCreateDto

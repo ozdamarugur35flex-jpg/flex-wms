@@ -14,6 +14,7 @@ const MinStockList: React.FC = () => {
   const [stocks, setStocks] = useState<StockCard[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [savingCode, setSavingCode] = useState<string | null>(null);
 
   const loadMinStocks = async () => {
     try {
@@ -31,6 +32,26 @@ const MinStockList: React.FC = () => {
   useEffect(() => {
     loadMinStocks();
   }, []);
+
+  const handleLevelChange = (code: string, value: string) => {
+    const numValue = parseFloat(value) || 0;
+    setStocks(prev => prev.map(s => s.code === code ? { ...s, minStockLevel: numValue } : s));
+  };
+
+  const handleSave = async (code: string, minLevel: number) => {
+    try {
+      setSavingCode(code);
+      const result = await (apiService.stocks as any).updateMinLevel(code, minLevel);
+      if (result.success) {
+        // Optional: show a success toast or icon
+      }
+    } catch (err) {
+      console.error("Güncelleme hatası", err);
+      alert("Hata oluştu");
+    } finally {
+      setSavingCode(null);
+    }
+  };
 
   const filteredStocks = useMemo(() => {
     return stocks.filter(s => 
@@ -61,7 +82,6 @@ const MinStockList: React.FC = () => {
         
         <div className="flex items-center gap-2">
           <button onClick={loadMinStocks} className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-600 rounded-xl text-xs font-bold hover:bg-slate-50 transition-all active:scale-95">
-            {/* Fix: Added missing RotateCcw import */}
             <RotateCcw size={16} className={loading ? 'animate-spin' : ''} /> Yenile
           </button>
           <button onClick={handleExportExcel} className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-600 rounded-xl text-xs font-bold hover:bg-slate-50 transition-all active:scale-95">
@@ -86,30 +106,86 @@ const MinStockList: React.FC = () => {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-slate-50/80 border-b border-slate-200">
-                <th className="px-6 py-4 text-[11px] font-black text-slate-400 uppercase tracking-widest">Stok Tanımı</th>
-                <th className="px-6 py-4 text-[11px] font-black text-slate-400 uppercase tracking-widest text-center">Mevcut</th>
-                <th className="px-6 py-4 text-[11px] font-black text-slate-400 uppercase tracking-widest text-center">Min. Seviye</th>
-                <th className="px-6 py-4 text-[11px] font-black text-slate-400 uppercase tracking-widest text-center">Max. Seviye</th>
-                <th className="px-6 py-4 text-[11px] font-black text-slate-400 uppercase tracking-widest text-right"></th>
+                <th className="px-6 py-4 text-[11px] font-black text-slate-400 uppercase tracking-widest text-left">Stok Tanımı</th>
+                <th className="px-6 py-4 text-[11px] font-black text-slate-400 uppercase tracking-widest text-center">Mevcut Stok</th>
+                <th className="px-6 py-4 text-[11px] font-black text-slate-400 uppercase tracking-widest text-center">Yıllık Satış (Çıkış)</th>
+                <th className="px-6 py-4 text-[11px] font-black text-slate-400 uppercase tracking-widest text-center w-32">Hedef Min. Seviye</th>
+                <th className="px-6 py-4 text-[11px] font-black text-slate-400 uppercase tracking-widest text-center">İhtiyaç / Fark</th>
+                <th className="px-6 py-4 text-[11px] font-black text-slate-400 uppercase tracking-widest text-center">Grup (Kod-1)</th>
+                <th className="px-6 py-4 text-[11px] font-black text-slate-400 uppercase tracking-widest text-right">İşlem</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-                {filteredStocks.map((stock, index) => (
-                  <tr key={stock.code || stock.id || index} className="hover:bg-rose-50/10 transition-colors group">
-                    <td className="px-6 py-4">
-                      <p className="text-sm font-bold text-slate-800 uppercase">{stock.name || 'İSİMSİZ'}</p>
-                      <p className="text-[10px] text-slate-400 font-mono font-bold uppercase">{stock.code || 'KODSUZ'}</p>
-                    </td>
-                    <td className="px-6 py-4 text-center font-black text-rose-600">{(Number(stock.quantity) || 0).toLocaleString()}</td>
-                    <td className="px-6 py-4 text-center font-black text-slate-400">{(Number(stock.minStockLevel) || 0).toLocaleString()}</td>
-                    <td className="px-6 py-4 text-center font-black text-slate-300">{(Number(stock.maxStockLevel) || 0).toLocaleString()}</td>
-                    <td className="px-6 py-4 text-right"><MoreHorizontal size={18} className="text-slate-300" /></td>
-                  </tr>
-                ))}
+                {filteredStocks.map((stock, index) => {
+                  const qty = Number(stock.quantity) || 0;
+                  const min = Number(stock.minStockLevel) || 0;
+                  const gap = Math.max(0, min - qty);
+                  
+                  // Boyama mantığı
+                  let rowBg = "hover:bg-slate-50";
+                  if (min > 0) {
+                    if (qty < min) {
+                      rowBg = "bg-rose-50/50 hover:bg-rose-50";
+                    } else if (qty <= min * 1.1) {
+                      rowBg = "bg-amber-50/50 hover:bg-amber-50";
+                    }
+                  }
+                  
+                  return (
+                    <tr key={stock.code || stock.id || index} className={`${rowBg} transition-colors group border-b border-slate-100`}>
+                      <td className="px-6 py-4">
+                        <p className="text-sm font-bold text-slate-800 uppercase">{stock.name || 'İSİMSİZ'}</p>
+                        <p className="text-[10px] text-slate-400 font-mono font-bold uppercase">{stock.code || 'KODSUZ'}</p>
+                      </td>
+                      <td className="px-6 py-4 text-center font-black text-blue-600">
+                        {qty.toLocaleString()}
+                      </td>
+                      <td className="px-6 py-4 text-center font-black text-amber-600">
+                        {(Number(stock.yearlySales) || 0).toLocaleString()}
+                      </td>
+                      <td className="px-6 py-4 text-center">
+                        <input 
+                          type="number" 
+                          className="w-24 px-2 py-1 bg-white border border-slate-200 rounded-lg text-sm font-black text-center outline-none focus:border-rose-400 transition-colors shadow-sm"
+                          value={stock.minStockLevel || 0}
+                          onChange={(e) => handleLevelChange(stock.code, e.target.value)}
+                        />
+                      </td>
+                      <td className={`px-6 py-4 text-center font-black ${gap > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>
+                        {gap > 0 ? (
+                          <div className="flex flex-col items-center">
+                            <span>{gap.toLocaleString()}</span>
+                            <span className="text-[9px] font-bold uppercase opacity-60">Eksik</span>
+                          </div>
+                        ) : (
+                          <div className="flex flex-col items-center">
+                            <span>0</span>
+                            <span className="text-[9px] font-bold uppercase opacity-60">Tamam</span>
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 text-center">
+                         <span className="text-xs font-bold text-slate-500 bg-slate-100 px-2 py-1 rounded-md uppercase">
+                           {stock.code1 || '-'}
+                         </span>
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <button 
+                          onClick={() => handleSave(stock.code, stock.minStockLevel || 0)}
+                          disabled={savingCode === stock.code}
+                          className="p-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition-all active:scale-95 disabled:opacity-50"
+                          title="Kaydet"
+                        >
+                          {savingCode === stock.code ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
             </tbody>
           </table>
         )}
-        {!loading && filteredStocks.length === 0 && <div className="p-20 text-center text-slate-300 font-bold uppercase tracking-widest">Kritik Stok Bulunmamaktadır</div>}
+        {!loading && filteredStocks.length === 0 && <div className="p-20 text-center text-slate-300 font-bold uppercase tracking-widest">Stok Tanımı Bulunamadı</div>}
       </div>
     </div>
   );
