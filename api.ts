@@ -270,6 +270,7 @@ const mapStockData = (item: any) => {
     lastPurchasePrice: Number(item.lastPurchasePrice ?? item.LastPurchasePrice ?? 0),
     lastPurchaseYear: item.lastPurchaseYear || item.LastPurchaseYear || '',
     isLocked: !!(item.isLocked ?? item.IsLocked ?? false),
+    yearlySales: Number(item.yearlySales ?? item.YearlySales ?? 0),
     isAutoConsumption: !!(item.isAutoConsumption ?? item.IsAutoConsumption ?? false),
     groupCode: item.groupCode || item.GroupCode || '',
     purchaseVat: (() => {
@@ -289,6 +290,7 @@ const mapStockData = (item: any) => {
     height: Number(item.height ?? item.Height ?? 0),
     depth: Number(item.depth ?? item.Depth ?? 0),
     kod1: item.kod1 || item.Kod1 || '',
+    code1: item.code1 || item.Code1 || item.kod1 || item.Kod1 || '',
     kod2: item.kod2 || item.Kod2 || '',
     kod3: item.kod3 || item.Kod3 || '',
     kod4: item.kod4 || item.Kod4 || '',
@@ -319,6 +321,13 @@ export const apiService = {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ code, minLevel })
+      }, { success: true }),
+
+    bulkUpdateMinLevels: (updates: { code: string; minLevel: number }[]) =>
+      request(`${API_BASE_URL}/stocks/bulk-update-min-levels`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates)
       }, { success: true }),
 
     getDetail: (code: string) => 

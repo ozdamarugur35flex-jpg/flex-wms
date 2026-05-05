@@ -3,8 +3,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { 
   MinusCircle, Search, Save, XCircle, AlertTriangle, Package, Calendar, Clock, 
   TrendingDown, Info, MoreHorizontal, FileSpreadsheet, Printer, Loader2,
-  // Added missing RotateCcw import
-  RotateCcw
+  RotateCcw, Upload
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { StockCard } from '../types';
@@ -15,6 +14,7 @@ const MinStockList: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [savingCode, setSavingCode] = useState<string | null>(null);
+  const [importing, setImporting] = useState(false);
 
   const loadMinStocks = async () => {
     try {
@@ -61,10 +61,69 @@ const MinStockList: React.FC = () => {
   }, [stocks, searchTerm]);
 
   const handleExportExcel = () => {
-    const worksheet = XLSX.utils.json_to_sheet(filteredStocks);
+    const exportData = filteredStocks.map(stock => {
+      const qty = Number(stock.quantity) || 0;
+      const min = Number(stock.minStockLevel) || 0;
+      const gap = Math.max(0, min - qty);
+
+      return {
+        "Stok Kodu": stock.code || '',
+        "Stok Adı": stock.name || '',
+        "Mevcut Stok": qty,
+        "Yıllık Satış (Çıkış)": Number(stock.yearlySales) || 0,
+        "Hedef Min. Seviye": min,
+        "İhtiyaç / Fark": gap,
+        "Grup (Kod-1)": stock.code1 || '-'
+      };
+    });
+
+    const worksheet = XLSX.utils.json_to_sheet(exportData);
     const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Kritik Stoklar");
-    XLSX.writeFile(workbook, "Kritik_Stok_Listesi.xlsx");
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Minimum Stok Listesi");
+    XLSX.writeFile(workbook, "Minimum_Stok_Listesi.xlsx");
+  };
+
+  const handleImportExcel = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+      try {
+        setImporting(true);
+        const bstr = evt.target?.result;
+        const wb = XLSX.read(bstr, { type: 'binary' });
+        const wsname = wb.SheetNames[0];
+        const ws = wb.Sheets[wsname];
+        const data = XLSX.utils.sheet_to_json(ws) as any[];
+
+        const updates = data.map(row => ({
+          code: String(row["Stok Kodu"] || ''),
+          minLevel: parseFloat(row["Hedef Min. Seviye"]) || 0
+        })).filter(u => u.code);
+
+        if (updates.length === 0) {
+          alert("Güncellenecek geçerli veri bulunamadı. Lütfen 'Stok Kodu' ve 'Hedef Min. Seviye' sütunlarını kontrol edin.");
+          return;
+        }
+
+        const confirmResult = confirm(`${updates.length} adet stok için minimum seviye güncellenecek. Onaylıyor musunuz?`);
+        if (!confirmResult) return;
+
+        const result = await (apiService.stocks as any).bulkUpdateMinLevels(updates);
+        if (result.success) {
+          alert("Toplu güncelleme başarıyla tamamlandı.");
+          loadMinStocks();
+        }
+      } catch (err) {
+        console.error("Excel içeri aktarma hatası", err);
+        alert("Dosya okunurken veya güncellenirken hata oluştu.");
+      } finally {
+        setImporting(false);
+        if (e.target) e.target.value = '';
+      }
+    };
+    reader.readAsBinaryString(file);
   };
 
   return (
@@ -84,6 +143,25 @@ const MinStockList: React.FC = () => {
           <button onClick={loadMinStocks} className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-600 rounded-xl text-xs font-bold hover:bg-slate-50 transition-all active:scale-95">
             <RotateCcw size={16} className={loading ? 'animate-spin' : ''} /> Yenile
           </button>
+          
+          <div className="relative group">
+            <input 
+              type="file" 
+              accept=".xlsx, .xls" 
+              className="hidden" 
+              id="excel-upload" 
+              onChange={handleImportExcel}
+              disabled={importing}
+            />
+            <label 
+              htmlFor="excel-upload" 
+              className={`flex items-center gap-2 px-4 py-2 bg-slate-900 border border-slate-900 text-white rounded-xl text-xs font-bold hover:bg-slate-800 transition-all active:scale-95 cursor-pointer ${importing ? 'opacity-50 pointer-events-none' : ''}`}
+            >
+              {importing ? <Loader2 size={16} className="animate-spin" /> : <Upload size={16} />} 
+              Excel'den Yükle
+            </label>
+          </div>
+
           <button onClick={handleExportExcel} className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-600 rounded-xl text-xs font-bold hover:bg-slate-50 transition-all active:scale-95">
             <FileSpreadsheet size={16} className="text-emerald-700" /> Excel Aktar
           </button>
@@ -103,18 +181,19 @@ const MinStockList: React.FC = () => {
             <Loader2 className="animate-spin text-rose-600" size={32} />
           </div>
         ) : (
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-slate-50/80 border-b border-slate-200">
-                <th className="px-6 py-4 text-[11px] font-black text-slate-400 uppercase tracking-widest text-left">Stok Tanımı</th>
-                <th className="px-6 py-4 text-[11px] font-black text-slate-400 uppercase tracking-widest text-center">Mevcut Stok</th>
-                <th className="px-6 py-4 text-[11px] font-black text-slate-400 uppercase tracking-widest text-center">Yıllık Satış (Çıkış)</th>
-                <th className="px-6 py-4 text-[11px] font-black text-slate-400 uppercase tracking-widest text-center w-32">Hedef Min. Seviye</th>
-                <th className="px-6 py-4 text-[11px] font-black text-slate-400 uppercase tracking-widest text-center">İhtiyaç / Fark</th>
-                <th className="px-6 py-4 text-[11px] font-black text-slate-400 uppercase tracking-widest text-center">Grup (Kod-1)</th>
-                <th className="px-6 py-4 text-[11px] font-black text-slate-400 uppercase tracking-widest text-right">İşlem</th>
-              </tr>
-            </thead>
+          <div className="overflow-auto max-h-[70vh]">
+            <table className="w-full text-left border-separate border-spacing-0">
+              <thead className="sticky top-0 z-30 shadow-sm">
+                <tr className="bg-slate-100">
+                  <th className="px-6 py-4 text-[11px] font-black text-slate-500 uppercase tracking-widest text-left sticky top-0 bg-slate-100 border-b border-slate-200">Stok Tanımı</th>
+                  <th className="px-6 py-4 text-[11px] font-black text-slate-500 uppercase tracking-widest text-center sticky top-0 bg-slate-100 border-b border-slate-200">Mevcut Stok</th>
+                  <th className="px-6 py-4 text-[11px] font-black text-slate-500 uppercase tracking-widest text-center sticky top-0 bg-slate-100 border-b border-slate-200">Yıllık Satış (Çıkış)</th>
+                  <th className="px-6 py-4 text-[11px] font-black text-slate-500 uppercase tracking-widest text-center w-32 sticky top-0 bg-slate-100 border-b border-slate-200">Hedef Min. Seviye</th>
+                  <th className="px-6 py-4 text-[11px] font-black text-slate-500 uppercase tracking-widest text-center sticky top-0 bg-slate-100 border-b border-slate-200">İhtiyaç / Fark</th>
+                  <th className="px-6 py-4 text-[11px] font-black text-slate-500 uppercase tracking-widest text-center sticky top-0 bg-slate-100 border-b border-slate-200">Grup (Kod-1)</th>
+                  <th className="px-6 py-4 text-[11px] font-black text-slate-500 uppercase tracking-widest text-right sticky top-0 bg-slate-100 border-b border-slate-200">İşlem</th>
+                </tr>
+              </thead>
             <tbody className="divide-y divide-slate-100">
                 {filteredStocks.map((stock, index) => {
                   const qty = Number(stock.quantity) || 0;
@@ -122,17 +201,17 @@ const MinStockList: React.FC = () => {
                   const gap = Math.max(0, min - qty);
                   
                   // Boyama mantığı
-                  let rowBg = "hover:bg-slate-50";
+                  let rowBg = "bg-white hover:bg-slate-50";
                   if (min > 0) {
                     if (qty < min) {
-                      rowBg = "bg-rose-50/50 hover:bg-rose-50";
+                      rowBg = "bg-rose-50/70 hover:bg-rose-100/70";
                     } else if (qty <= min * 1.1) {
-                      rowBg = "bg-amber-50/50 hover:bg-amber-50";
+                      rowBg = "bg-amber-50/70 hover:bg-amber-100/70";
                     }
                   }
                   
                   return (
-                    <tr key={stock.code || stock.id || index} className={`${rowBg} transition-colors group border-b border-slate-100`}>
+                    <tr key={stock.code || stock.id || index} className={`${rowBg} transition-colors group`}>
                       <td className="px-6 py-4">
                         <p className="text-sm font-bold text-slate-800 uppercase">{stock.name || 'İSİMSİZ'}</p>
                         <p className="text-[10px] text-slate-400 font-mono font-bold uppercase">{stock.code || 'KODSUZ'}</p>
@@ -184,6 +263,7 @@ const MinStockList: React.FC = () => {
                 })}
             </tbody>
           </table>
+          </div>
         )}
         {!loading && filteredStocks.length === 0 && <div className="p-20 text-center text-slate-300 font-bold uppercase tracking-widest">Stok Tanımı Bulunamadı</div>}
       </div>

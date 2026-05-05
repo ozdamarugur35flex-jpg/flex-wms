@@ -187,6 +187,47 @@ namespace FlexWms.Api.Controllers
             }
         }
 
+        [HttpPost("bulk-update-min-levels")]
+        public IActionResult BulkUpdateMinLevels([FromBody] List<MinLevelUpdateDto> updates)
+        {
+            if (updates == null || updates.Count == 0)
+                return BadRequest("Güncellenecek veri bulunamadı.");
+
+            try
+            {
+                using (SqlConnection conn = new SqlConnection(_connectionString))
+                {
+                    conn.Open();
+                    using (SqlTransaction trans = conn.BeginTransaction())
+                    {
+                        try
+                        {
+                            string sql = "UPDATE TBLSTSABIT SET ASGARI_STOK = @minLevel WHERE STOK_KODU = @code";
+                            foreach (var update in updates)
+                            {
+                                if (string.IsNullOrEmpty(update.Code)) continue;
+                                SqlCommand cmd = new SqlCommand(sql, conn, trans);
+                                cmd.Parameters.AddWithValue("@minLevel", update.MinLevel);
+                                cmd.Parameters.AddWithValue("@code", update.Code);
+                                cmd.ExecuteNonQuery();
+                            }
+                            trans.Commit();
+                            return Ok(new { success = true, message = $"{updates.Count} adet stok güncellendi." });
+                        }
+                        catch (Exception innerEx)
+                        {
+                            trans.Rollback();
+                            return StatusCode(500, $"İşlem sırasında hata: {innerEx.Message}");
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"Bağlantı Hatası: {ex.Message}");
+            }
+        }
+
         [HttpGet("{code}")]
         public IActionResult GetStockByCode(string code)
         {
