@@ -140,7 +140,6 @@ const AppContent: React.FC = () => {
         { id: 'satin-alma-talep', label: 'Satın Alma Talepleri', icon: <ShoppingCart size={18} />, path: '/satin-alma-talep' },
         { id: 'satin-alma-siparis', label: 'Satın Alma Siparişleri', icon: <Truck size={18} />, path: '/satin-alma-siparis' },
         { id: 'varyant-tanim', label: 'Varyant Tanımları', icon: <Layers size={18} />, path: '/varyant-definition' },
-        { id: 'min-stok', label: 'Minimum Stok Listesi', icon: <MinusCircle size={18} />, path: '/min-stok' },
       ]
     },
     {
@@ -149,6 +148,7 @@ const AppContent: React.FC = () => {
         { id: 'satinalma-talep', label: 'Satınalma Talepleri', icon: <FilePlus size={18} />, path: '/satinalma-talep' },
         { id: 'satinalma-siparis', label: 'Satınalma Siparişleri', icon: <ShoppingCart size={18} />, path: '/satinalma-siparis' },
         { id: 'malzeme-takip', label: 'Malzeme Sipariş Durum', icon: <PackageSearch size={18} />, path: '/malzeme-siparis-durum' },
+        { id: 'min-stok', label: 'Minimum Stok Listesi', icon: <MinusCircle size={18} />, path: '/min-stok' },
       ]
     },
     {

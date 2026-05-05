@@ -107,6 +107,54 @@ namespace FlexWms.Api.Controllers
             }
         }
 
+        [HttpGet("min-levels")]
+        public IActionResult GetMinStockLevels()
+        {
+            List<object> stocks = new List<object>();
+            try
+            {
+                using (SqlConnection conn = new SqlConnection(_connectionString))
+                {
+                    // Netsis Standart: ASGARI_STOK alanından küçük olanlar
+                    string sql = @"SELECT S.STOK_KODU, S.STOK_ADI, S.OLCU_BR1, S.ASGARI_STOK, S.AZAMI_STOK, 
+                                   ISNULL((SELECT SUM(STHAR_GCMIK * (CASE WHEN STHAR_GCKOD = 'G' THEN 1 ELSE -1 END)) 
+                                           FROM TBLSTHAR WITH(NOLOCK) 
+                                           WHERE STOK_KODU = S.STOK_KODU AND DEPO_KODU = 100), 0) as MIKTAR
+                                   FROM TBLSTSABIT S WITH(NOLOCK)
+                                   WHERE S.DEPO_KODU = 100 
+                                   AND S.ASGARI_STOK > 0
+                                   AND ISNULL((SELECT SUM(STHAR_GCMIK * (CASE WHEN STHAR_GCKOD = 'G' THEN 1 ELSE -1 END)) 
+                                               FROM TBLSTHAR WITH(NOLOCK) 
+                                               WHERE STOK_KODU = S.STOK_KODU AND DEPO_KODU = 100), 0) < S.ASGARI_STOK
+                                   ORDER BY S.STOK_KODU ASC";
+
+                    SqlCommand cmd = new SqlCommand(sql, conn);
+                    conn.Open();
+
+                    using (SqlDataReader rdr = cmd.ExecuteReader())
+                    {
+                        while (rdr.Read())
+                        {
+                            stocks.Add(new
+                            {
+                                Code = rdr["STOK_KODU"].ToString().Trim(),
+                                Name = rdr["STOK_ADI"].ToString().Trim(),
+                                Unit = rdr["OLCU_BR1"].ToString().Trim(),
+                                Quantity = Convert.ToDouble(rdr["MIKTAR"]),
+                                MinStockLevel = Convert.ToDouble(rdr["ASGARI_STOK"]),
+                                MaxStockLevel = Convert.ToDouble(rdr["AZAMI_STOK"])
+                            });
+                        }
+                    }
+                }
+                return Ok(stocks);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"SQL Hatası: {ex.Message}");
+            }
+        }
+
         [HttpGet("{code}")]
         public IActionResult GetStockByCode(string code)
         {

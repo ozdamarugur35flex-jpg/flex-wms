@@ -29,8 +29,9 @@ async function startServer() {
       unit1: 'ADET',
       purchaseVat: 10,
       salesVat: 10,
-      quantity: 1500,
+      quantity: 400,
       minStockLevel: 500,
+      warehouseCode: 100,
       isLocked: false,
       producerCode: 'AKSOY-01',
       customsCode: '7604.21.00.00.00',
@@ -53,8 +54,9 @@ async function startServer() {
       unit1: 'ADET',
       purchaseVat: 1,
       salesVat: null,
-      quantity: 500,
+      quantity: 50,
       minStockLevel: 100,
+      warehouseCode: 100,
       isLocked: false,
       salesPrices: [1390]
     }
@@ -184,7 +186,7 @@ async function startServer() {
 
   // [GET] /api/stocks/min-levels
   app.get("/api/stocks/min-levels", (req, res) => {
-    const minStocks = stocks.filter(s => s.quantity < s.minStockLevel);
+    const minStocks = stocks.filter(s => s.quantity < s.minStockLevel && (s as any).warehouseCode === 100);
     res.json(minStocks);
   });
 
