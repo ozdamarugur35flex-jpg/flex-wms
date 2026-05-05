@@ -22,6 +22,7 @@ namespace FlexWms.Api.Controllers
                     string sql = @"SELECT A.STOK_KODU, S.STOK_ADI, A.AMBAR_KODU, A.ASGARI_SEVIYE, A.AZAMI_SEVIYE, A.SIPARIS_NOKTASI
                                    FROM TBLSTOKAMBAR A WITH(NOLOCK)
                                    LEFT JOIN TBLSTSABIT S WITH(NOLOCK) ON A.STOK_KODU = S.STOK_KODU
+                                   WHERE S.DEPO_KODU = 100
                                    ORDER BY A.STOK_KODU, A.AMBAR_KODU";
 
                     SqlCommand cmd = new SqlCommand(sql, conn);

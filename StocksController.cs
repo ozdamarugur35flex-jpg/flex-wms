@@ -43,7 +43,7 @@ namespace FlexWms.Api.Controllers
                                    END as SON_ALIS_YILI
                                    FROM TBLSTSABIT S WITH(NOLOCK) 
                                    LEFT JOIN TBLSTSABITEK EK WITH(NOLOCK) ON S.STOK_KODU = EK.STOK_KODU
-                                   WHERE 1=1";
+                                   WHERE S.DEPO_KODU = 100";
 
                     if (!includeYM)
                     {
@@ -134,7 +134,7 @@ namespace FlexWms.Api.Controllers
                                    END as SON_ALIS_YILI
                                    FROM TBLSTSABIT S WITH(NOLOCK) 
                                    LEFT JOIN TBLSTSABITEK EK WITH(NOLOCK) ON S.STOK_KODU = EK.STOK_KODU
-                                   WHERE S.STOK_KODU = @code";
+                                   WHERE S.STOK_KODU = @code AND S.DEPO_KODU = 100";
 
                     SqlCommand cmd = new SqlCommand(sql, conn);
                     cmd.Parameters.AddWithValue("@code", code);

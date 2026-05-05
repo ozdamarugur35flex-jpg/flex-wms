@@ -52,7 +52,7 @@ namespace tuckapi.Controllers
                         ISNULL(ST.STOK_ADI, '') as stokAdi,
                         ISNULL(C.CARI_ISIM, '') as cariIsim
                     FROM FLEX_WMS_SEVK_EMRI S
-                    LEFT JOIN TBLSTSABIT ST ON ST.STOK_KODU = S.StokKodu
+                    LEFT JOIN TBLSTSABIT ST ON ST.STOK_KODU = S.StokKodu AND ST.DEPO_KODU = 100
                     LEFT JOIN TBLCASABIT C ON C.CARI_KOD = S.CariKodu
                     ORDER BY S.KayitTarihi DESC";
 
@@ -111,10 +111,11 @@ namespace tuckapi.Controllers
                         ISNULL(ST.OLCU_BR1, 'ADET') as unit,
                         T.DEPO_KODU as warehouseCode
                     FROM TBLSIPATRA T
-                    LEFT JOIN TBLSTSABIT ST ON ST.STOK_KODU = T.STOK_KODU
+                    LEFT JOIN TBLSTSABIT ST ON ST.STOK_KODU = T.STOK_KODU AND ST.DEPO_KODU = 100
                     WHERE RTRIM(T.FISNO) = RTRIM(@orderNo) 
                     AND T.STHAR_FTIRSIP = '6' 
-                    AND (T.STHAR_GCMIK - ISNULL(T.FIRMA_DOVTUT, 0)) > 0";
+                    AND (T.STHAR_GCMIK - ISNULL(T.FIRMA_DOVTUT, 0)) > 0
+                    AND (ST.DEPO_KODU = 100 OR ST.STOK_KODU IS NOT NULL) -- Ensure we only show stocks from warehouse 100 if joined
 
                 var result = await conn.QueryAsync(sql, new { orderNo });
                 return Ok(result);

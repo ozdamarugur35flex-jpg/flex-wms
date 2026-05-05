@@ -22,7 +22,7 @@ namespace tuckapi.Controllers
 
                 // 1. Toplam Stok Değeri
                 var totalValue = await conn.ExecuteScalarAsync<decimal>(@"
-                    SELECT ISNULL(SUM(MIKTAR * ALIS_FIAT1), 0) FROM TBLSTSABIT WITH(NOLOCK)");
+                    SELECT ISNULL(SUM(MIKTAR * ALIS_FIAT1), 0) FROM TBLSTSABIT WITH(NOLOCK) WHERE DEPO_KODU = 100");
 
                 // 2. Bekleyen Sevk Emri Sayısı
                 var pendingShipments = await conn.ExecuteScalarAsync<int>(@"

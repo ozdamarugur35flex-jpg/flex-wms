@@ -175,7 +175,7 @@ namespace tuckapi.Controllers
                         (S.STHAR_GCMIK * S.STHAR_NF) as Total,
                         S.DEPO_KODU as WarehouseCode
                     FROM TBLSTHAR S
-                    LEFT JOIN TBLSTSABIT SB ON SB.STOK_KODU = S.STOK_KODU
+                    LEFT JOIN TBLSTSABIT SB ON SB.STOK_KODU = S.STOK_KODU AND SB.DEPO_KODU = 100
                     WHERE RTRIM(S.FISNO) = RTRIM(@invoiceNo) AND S.STHAR_FTIRSIP IN ('1', '3')
                     ORDER BY S.SIRA";
 
@@ -272,7 +272,7 @@ namespace tuckapi.Controllers
                 foreach (var item in request.Items)
                 {
                     // TBLSTSABIT sorgusuna WITH(NOLOCK) eklendi
-                    string stockInfoSql = "SELECT SATIS_FIAT1, KDV_ORANI FROM TBLSTSABIT WITH(NOLOCK) WHERE STOK_KODU = @StockCode";
+                    string stockInfoSql = "SELECT SATIS_FIAT1, KDV_ORANI FROM TBLSTSABIT WITH(NOLOCK) WHERE STOK_KODU = @StockCode AND DEPO_KODU = 100";
                     var stockInfo = await conn.QueryFirstOrDefaultAsync(stockInfoSql, new { item.StockCode }, transaction);
 
                     // KDV ve Fiyat SADECE stok kartından (TBLSTSABIT) gelecek

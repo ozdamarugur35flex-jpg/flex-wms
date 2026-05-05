@@ -112,7 +112,7 @@ namespace tuckapi.Controllers
                         RTRIM(H.DEPO_KODU) as WarehouseCode,
                         RTRIM(H.OLCUBR) as Unit
                     FROM TBLSTHAR H WITH (NOLOCK)
-                    LEFT JOIN TBLSTSABIT S WITH (NOLOCK) ON S.STOK_KODU = H.STOK_KODU
+                    LEFT JOIN TBLSTSABIT S WITH (NOLOCK) ON S.STOK_KODU = H.STOK_KODU AND S.DEPO_KODU = 100
                     WHERE H.STHAR_FTIRSIP = '4' AND H.FISNO = @invoiceNo";
 
                 var items = await conn.QueryAsync<dynamic>(sqlItems, new { invoiceNo });
@@ -181,7 +181,7 @@ namespace tuckapi.Controllers
                 foreach (var item in request.Items)
                 {
                     var kdvRate = await conn.QueryFirstOrDefaultAsync<decimal>(
-                        "SELECT ISNULL(KDV_ORANI, 0) FROM TBLSTSABIT WHERE STOK_KODU = @StockCode",
+                        "SELECT ISNULL(KDV_ORANI, 0) FROM TBLSTSABIT WHERE STOK_KODU = @StockCode AND DEPO_KODU = 100",
                         new { item.StockCode }, transaction);
 
                     totalBrut += item.Quantity * item.Price;

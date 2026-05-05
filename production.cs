@@ -37,8 +37,9 @@ namespace tuckapi.Controllers
                         (CASE WHEN S.STHAR_GCKOD = 'G' THEN 'Giriş' ELSE 'Çıkış' END) as Type,
                         RTRIM(S.STHAR_KOD2) as DocumentPath
                     FROM TBLSTHAR S WITH (NOLOCK)
-                    LEFT JOIN TBLSTSABIT ST WITH (NOLOCK) ON ST.STOK_KODU = S.STOK_KODU
+                    LEFT JOIN TBLSTSABIT ST WITH (NOLOCK) ON ST.STOK_KODU = S.STOK_KODU AND ST.DEPO_KODU = 100
                     WHERE S.STHAR_FTIRSIP = '5' AND S.STHAR_HTUR IN ('A', 'U')
+                    AND (ST.DEPO_KODU = 100 OR ST.STOK_KODU IS NOT NULL)
                     ORDER BY S.STHAR_TARIH DESC";
 
                 var movements = await conn.QueryAsync(sql);
@@ -131,12 +132,12 @@ namespace tuckapi.Controllers
                         SUBE_KODU, FISNO, STOK_KODU, STHAR_TARIH, STHAR_GCMIK, 
                         STHAR_GCMIK2, STHAR_GCKOD, STHAR_HTUR, STHAR_FTIRSIP,
                         DEPO_KODU, STHAR_ACIKLAMA, STHAR_KOD2, STHAR_BGTIP,
-                        SIRA, STHAR_KOD1, KAYITTARIHI, KAYITYAPANKUL, DUZELTMETARIHI
+                        SIRA, STHAR_KOD1, DUZELTMETARIHI
                     ) VALUES (
                         0, @SlipNo, @StockCode, GETDATE(), @Quantity,
                         @Quantity, @GCKod, 'A', '5',
                         @WarehouseCode, @Notes, @DocumentPath, 'I',
-                        1, 'M', GETDATE(), 'FLEX_API', GETDATE()
+                        1, 'M', GETDATE()
                     )";
 
                 await conn.ExecuteAsync(sqlLine, new {
