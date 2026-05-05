@@ -137,8 +137,6 @@ const AppContent: React.FC = () => {
         { id: 'hucre-kapasite', label: 'Hücre Kapasiteleri', icon: <Gauge size={18} />, path: '/hucre-kapasite' },
         { id: 'stok-depo-limit', label: 'Stok Depo Limitleri', icon: <ArrowDownCircle size={18} />, path: '/stok-depo-limit' },
         { id: 'depo-kapasite', label: 'Kapasite Tanımları', icon: <Gauge size={18} />, path: '/depo-kapasite' },
-        { id: 'satin-alma-talep', label: 'Satın Alma Talepleri', icon: <ShoppingCart size={18} />, path: '/satin-alma-talep' },
-        { id: 'satin-alma-siparis', label: 'Satın Alma Siparişleri', icon: <Truck size={18} />, path: '/satin-alma-siparis' },
         { id: 'varyant-tanim', label: 'Varyant Tanımları', icon: <Layers size={18} />, path: '/varyant-definition' },
       ]
     },

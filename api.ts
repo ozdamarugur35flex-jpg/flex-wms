@@ -381,6 +381,11 @@ export const apiService = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
     }, { success: true }),
+    bulkSave: (items: any[]) => request(`${API_BASE_URL}/purchaserequests/bulk`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(items)
+    }, { success: true }),
     delete: (requestNo: string) => request(`${API_BASE_URL}/purchaserequests/${requestNo}`, { method: 'DELETE' }, { success: true }),
     convertToOrder: (requestNo: string, customerCode: string) => request(`${API_BASE_URL}/purchaserequests/${requestNo}/convert-to-order`, {
       method: 'POST',

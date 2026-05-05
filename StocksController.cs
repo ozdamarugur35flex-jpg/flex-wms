@@ -125,7 +125,8 @@ namespace FlexWms.Api.Controllers
                                    ISNULL((SELECT SUM(STHAR_GCMIK) 
                                            FROM TBLSTHAR WITH(NOLOCK) 
                                            WHERE STOK_KODU = S.STOK_KODU AND DEPO_KODU = 100 AND STHAR_GCKOD = 'C' 
-                                           AND YEAR(STHAR_TARIH) = YEAR(GETDATE())), 0) as YILLIK_CIKIS
+                                           AND YEAR(STHAR_TARIH) = YEAR(GETDATE())
+                                           AND STHAR_ACIKLAMA NOT LIKE '%SAYIM%'), 0) as YILLIK_CIKIS
                                    FROM TBLSTSABIT S WITH(NOLOCK)
                                    WHERE S.DEPO_KODU = 100 
                                    ORDER BY S.STOK_KODU ASC";
