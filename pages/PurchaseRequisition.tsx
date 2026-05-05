@@ -65,9 +65,10 @@ const PurchaseRequisition: React.FC = () => {
   }, []);
 
   const filteredReqs = useMemo(() => {
-    return reqs.filter(r => 
-      r.stockName.toLowerCase().includes(searchTerm.toLowerCase()) || 
-      r.stockCode.toLowerCase().includes(searchTerm.toLowerCase())
+    return (reqs || []).filter(r => 
+      (r?.stockName?.toLowerCase() || '').includes(searchTerm.toLowerCase()) || 
+      (r?.stockCode?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+      (r?.requestNo?.toLowerCase() || '').includes(searchTerm.toLowerCase())
     );
   }, [reqs, searchTerm]);
 
@@ -82,9 +83,9 @@ const PurchaseRequisition: React.FC = () => {
   const [selectedItems, setSelectedItems] = useState<Record<string, number>>({});
 
   const filteredModalStocks = useMemo(() => {
-    return stocks.filter(s => 
-      s.name.toLowerCase().includes(modalSearch.toLowerCase()) || 
-      s.code.toLowerCase().includes(modalSearch.toLowerCase())
+    return (stocks || []).filter(s => 
+      (s?.name?.toLowerCase() || '').includes(modalSearch.toLowerCase()) || 
+      (s?.code?.toLowerCase() || '').includes(modalSearch.toLowerCase())
     ).sort((a, b) => {
       // Kritik olanları üste alalım
       const aKritik = a.quantity < a.minStockLevel;
@@ -197,10 +198,10 @@ const PurchaseRequisition: React.FC = () => {
               ) : filteredReqs.map((r, idx) => (
                 <tr key={r.id || idx} className="hover:bg-indigo-50/20 transition-all group">
                   <td className="px-6 py-4">
-                    <p className="text-sm font-black text-slate-800">{r.stockName}</p>
-                    <p className="text-[10px] text-slate-400 uppercase tracking-tighter">{r.branchName} • {r.stockCode}</p>
+                    <p className="text-sm font-black text-slate-800">{r.stockName || 'Stok Bilgisi Yok'}</p>
+                    <p className="text-[10px] text-slate-400 uppercase tracking-tighter">{r.branchName || '-'} • {r.requestNo} • {r.stockCode || 'N/A'}</p>
                   </td>
-                  <td className="px-6 py-4 text-center font-black text-indigo-600 font-mono">{r.requestedQty.toLocaleString()}</td>
+                  <td className="px-6 py-4 text-center font-black text-indigo-600 font-mono">{(r.requestedQty || 0).toLocaleString()}</td>
                   <td className="px-6 py-4 text-center text-[10px] font-bold text-slate-500 uppercase">{r.date ? new Date(r.date).toLocaleDateString('tr-TR') : '-'}</td>
                   <td className="px-6 py-4 text-center">
                     <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase border ${

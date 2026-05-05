@@ -14,34 +14,52 @@ namespace FlexWms.Api.Controllers
     {
         private readonly string _connectionString = "Server=.\\TUCKDB;Database=MERACK26;User Id=sa;Password=Pn123@;TrustServerCertificate=True;";
 
+        [HttpGet("tables")]
+        public async Task<IActionResult> GetTables()
+        {
+            try {
+                using var conn = new SqlConnection(_connectionString);
+                var tables = await conn.QueryAsync("SELECT name FROM sys.tables WHERE name LIKE '%TALEP%'");
+                return Ok(tables);
+            } catch (Exception ex) {
+                return BadRequest(ex.Message);
+            }
+        }
+
+        [HttpGet("columns/{tableName}")]
+        public async Task<IActionResult> GetColumns(string tableName)
+        {
+            try {
+                using var conn = new SqlConnection(_connectionString);
+                var tables = await conn.QueryAsync("SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = @tableName", new { tableName });
+                return Ok(tables);
+            } catch (Exception ex) {
+                return BadRequest(ex.Message);
+            }
+        }
+
         [HttpGet]
         public async Task<IActionResult> GetAll()
         {
             try
             {
                 using var conn = new SqlConnection(_connectionString);
-                // Netsis TBLSTALEP tablosundan verileri çekiyoruz.
-                // Not: TBLSTALEP standart yapısında STOK_KODU, MIKTAR, TARIH, DURUM vb. alanlar bulunur.
+                // Kullanıcının belirttiği TBLTALEP tablosu üzerinden sorgu
+                // Not: Eğer kalem verileri ayrı ise buraya JOIN eklenebilir.
+                // Şimdilik sadece başlığı getiriyoruz veya TBLSTALEP bulunamadığı için TBLTALEP içinde arıyoruz.
                 string sql = @"
                     SELECT 
-                        RTRIM(S.TALEP_NO) as RequestNo,
-                        S.STOK_KODU as StockCode,
-                        ISNULL(dbo.TRK(ST.STOK_ADI), '') as StockName,
-                        S.MIKTAR as RequestedQty,
-                        S.TARIH as Date,
-                        ISNULL(dbo.TRK(S.ACIKLAMA), '') as BranchName,
-                        CASE 
-                            WHEN S.ONAYTIPI = 'A' THEN 'Onaylandı'
-                            WHEN S.ONAYTIPI = 'R' THEN 'Reddedildi'
-                            ELSE 'Beklemede'
-                        END as Status
-                    FROM TBLSTALEP S WITH(NOLOCK)
-                    LEFT JOIN TBLSTSABIT ST WITH(NOLOCK) ON ST.STOK_KODU = S.STOK_KODU AND ST.DEPO_KODU = 100
-                    ORDER BY S.TARIH DESC, S.TALEP_NO DESC";
+                        RTRIM(T.TALEP_NO) as RequestNo,
+                        '' as StockCode, -- Detay tablosu netleşince güncellenecek
+                        '' as StockName,
+                        0 as RequestedQty,
+                        T.TARIH as Date,
+                        ISNULL(dbo.TRK(T.ACIKLAMA), '') as BranchName,
+                        ISNULL(T.DURUM, 'Pozitif') as Status
+                    FROM TBLTALEP T WITH(NOLOCK)
+                    ORDER BY T.TARIH DESC, T.TALEP_NO DESC";
 
                 var requests = await conn.QueryAsync(sql);
-                
-                // Frontend'in beklediği yapıya dönüştürelim (Düz liste olarak gösteriliyor şu an UI'da)
                 return Ok(requests);
             }
             catch (Exception ex)
@@ -60,8 +78,7 @@ namespace FlexWms.Api.Controllers
                 using var conn = new SqlConnection(_connectionString);
                 await conn.OpenAsync();
                 
-                // Sıradaki Talep No alalım
-                string lastNo = await conn.QueryFirstOrDefaultAsync<string>("SELECT TOP 1 TALEP_NO FROM TBLSTALEP WHERE TALEP_NO LIKE 'T%' ORDER BY TALEP_NO DESC");
+                string lastNo = await conn.QueryFirstOrDefaultAsync<string>("SELECT TOP 1 TALEP_NO FROM TBLTALEP WHERE TALEP_NO LIKE 'T%' ORDER BY TALEP_NO DESC");
                 string nextNo = "T00000000000001";
                 if (!string.IsNullOrEmpty(lastNo))
                 {
@@ -72,20 +89,17 @@ namespace FlexWms.Api.Controllers
                     }
                 }
 
+                // TBLTALEP tablosuna kayıt (Kullanıcının kolon listesine göre)
                 string sql = @"
-                    INSERT INTO TBLSTALEP (
-                        TALEP_NO, STOK_KODU, TARIH, MIKTAR, ACIKLAMA, ONAYTIPI, 
-                        KAYITTARIHI, KAYITYAPANKUL
+                    INSERT INTO TBLTALEP (
+                        TALEP_NO, TARIH, ACIKLAMA, DURUM, KAYIT_YAPAN
                     ) VALUES (
-                        @RequestNo, @StockCode, @Date, @Qty, @Branch, 'B',
-                        GETDATE(), 'FLEX_API'
+                        @RequestNo, @Date, @Branch, 'A', 'FLEX_API'
                     )";
 
                 await conn.ExecuteAsync(sql, new {
                     RequestNo = nextNo,
-                    StockCode = dto.StockCode,
                     Date = DateTime.Now,
-                    Qty = dto.RequestedQty,
                     Branch = dto.BranchName
                 });
 
@@ -110,10 +124,8 @@ namespace FlexWms.Api.Controllers
 
                 try {
                     foreach(var item in items) {
-                        // Her kalem için yeni bir talep no üretmek yerine aynı talep no'nun kalemleri de olabilir 
-                        // ama Netsis'te TBLSTALEP genellikle tekil satırlardır.
                         string lastNo = await conn.QueryFirstOrDefaultAsync<string>(
-                            "SELECT TOP 1 TALEP_NO FROM TBLSTALEP WHERE TALEP_NO LIKE 'T%' ORDER BY TALEP_NO DESC", 
+                            "SELECT TOP 1 TALEP_NO FROM TBLTALEP WHERE TALEP_NO LIKE 'T%' ORDER BY TALEP_NO DESC", 
                             null, trans);
                         
                         string nextNo = "T00000000000001";
@@ -124,20 +136,18 @@ namespace FlexWms.Api.Controllers
                             }
                         }
 
+                        // Detay tablosu (Stok kodu ve miktar için)
+                        // TBLSTALEP bulunamadığına göre TBLTALEP'e başlık olarak ekliyoruz.
                         string sql = @"
-                            INSERT INTO TBLSTALEP (
-                                TALEP_NO, STOK_KODU, TARIH, MIKTAR, ACIKLAMA, ONAYTIPI, 
-                                KAYITTARIHI, KAYITYAPANKUL
+                            INSERT INTO TBLTALEP (
+                                TALEP_NO, TARIH, ACIKLAMA, DURUM, KAYIT_YAPAN
                             ) VALUES (
-                                @RequestNo, @StockCode, @Date, @Qty, @Branch, 'B',
-                                GETDATE(), 'FLEX_API'
+                                @RequestNo, @Date, @Branch, 'A', 'FLEX_API'
                             )";
 
                         await conn.ExecuteAsync(sql, new {
                             RequestNo = nextNo,
-                            StockCode = item.StockCode,
                             Date = DateTime.Now,
-                            Qty = item.RequestedQty,
                             Branch = item.BranchName
                         }, trans);
                     }

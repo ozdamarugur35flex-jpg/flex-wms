@@ -121,6 +121,10 @@ const mapPurchaseRequestData = (item: any) => {
     status: item.status || item.Status || 'Taslak',
     requestedBy: item.requestedBy || item.RequestedBy || '',
     totalItems: Number(item.totalItems ?? item.TotalItems ?? 0),
+    stockCode: item.stockCode || item.StockCode || '',
+    stockName: item.stockName || item.StockName || '',
+    requestedQty: Number(item.requestedQty ?? item.RequestedQty ?? 0),
+    branchName: item.branchName || item.BranchName || '',
     items: Array.isArray(item.items || item.Items) ? (item.items || item.Items).map((line: any) => ({
       id: line.id || line.Id || Math.random().toString(36).substr(2, 9),
       stockCode: line.stockCode || line.StockCode || '',
