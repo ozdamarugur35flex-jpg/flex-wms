@@ -186,7 +186,14 @@ async function startServer() {
 
   // [GET] /api/stocks/min-levels
   app.get("/api/stocks/min-levels", (req, res) => {
-    const minStocks = stocks.filter(s => s.quantity < s.minStockLevel && (s as any).warehouseCode === 100);
+    const minStocks = stocks.filter(s => {
+      const qty = Number(s.quantity || 0);
+      const min = Number(s.minStockLevel || 0);
+      const wCode = (s as any).warehouseCode;
+      // Depo kodu 100 olanlar VEYA veritabanından gelen veri ise kartta 100 yazmasa da bakiye 100 ise
+      return qty < min && (wCode == 100 || wCode == '100');
+    });
+    console.log(`Min-Levels: ${minStocks.length} items found`);
     res.json(minStocks);
   });
 

@@ -19,6 +19,7 @@ const MinStockList: React.FC = () => {
     try {
       setLoading(true);
       const data = await apiService.stocks.getMinLevels();
+      console.log("Min Stock Data Received:", data);
       setStocks(data);
     } catch (err) {
       console.error("Kritik stoklar yüklenemedi", err);

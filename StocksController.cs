@@ -115,14 +115,14 @@ namespace FlexWms.Api.Controllers
             {
                 using (SqlConnection conn = new SqlConnection(_connectionString))
                 {
-                    // Netsis Standart: ASGARI_STOK alanından küçük olanlar
+                    // Şartı biraz esnetiyoruz: Stok kartında depo kodu 100 olanlar VEYA 100 nolu depoda bakiyesi olanlar
                     string sql = @"SELECT S.STOK_KODU, S.STOK_ADI, S.OLCU_BR1, S.ASGARI_STOK, S.AZAMI_STOK, 
                                    ISNULL((SELECT SUM(STHAR_GCMIK * (CASE WHEN STHAR_GCKOD = 'G' THEN 1 ELSE -1 END)) 
                                            FROM TBLSTHAR WITH(NOLOCK) 
                                            WHERE STOK_KODU = S.STOK_KODU AND DEPO_KODU = 100), 0) as MIKTAR
                                    FROM TBLSTSABIT S WITH(NOLOCK)
-                                   WHERE S.DEPO_KODU = 100 
-                                   AND S.ASGARI_STOK > 0
+                                   WHERE S.ASGARI_STOK > 0
+                                   AND (S.DEPO_KODU = 100 OR EXISTS(SELECT 1 FROM TBLSTHAR WHERE STOK_KODU = S.STOK_KODU AND DEPO_KODU = 100))
                                    AND ISNULL((SELECT SUM(STHAR_GCMIK * (CASE WHEN STHAR_GCKOD = 'G' THEN 1 ELSE -1 END)) 
                                                FROM TBLSTHAR WITH(NOLOCK) 
                                                WHERE STOK_KODU = S.STOK_KODU AND DEPO_KODU = 100), 0) < S.ASGARI_STOK
