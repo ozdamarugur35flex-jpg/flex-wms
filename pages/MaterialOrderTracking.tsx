@@ -284,7 +284,7 @@ const MaterialOrderTracking: React.FC = () => {
                 {filteredOrders.map((order) => (
                   <tr 
                     key={order.id} 
-                    onClick={() => handleRowClick(order)}
+                    onDoubleClick={() => handleRowClick(order)}
                     className="hover:bg-slate-50/50 transition-colors group cursor-pointer"
                   >
                     <td className="px-6 py-4">

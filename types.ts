@@ -520,6 +520,7 @@ export interface PurchaseOrderItem {
     stockName: string;
     branchName: string;
     supplierName: string;
+    customerCode: string;
     orderedQty: number;
     receivedQty: number;
     balance: number;

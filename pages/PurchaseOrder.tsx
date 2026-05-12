@@ -1,5 +1,6 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
   ShoppingCart, 
   Search, 
@@ -30,9 +31,11 @@ import { PurchaseOrderItem, DeliveryHistory } from '../types';
 import { apiService } from '../api';
 
 const PurchaseOrder: React.FC = () => {
+  const navigate = useNavigate();
   const [orders, setOrders] = useState<PurchaseOrderItem[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedOrder, setSelectedOrder] = useState<PurchaseOrderItem | null>(null);
+  const [stockDetail, setStockDetail] = useState<any>(null);
   const [receiveQty, setReceiveQty] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -61,6 +64,19 @@ const PurchaseOrder: React.FC = () => {
       o.branchName.toLowerCase().includes(searchTerm.toLowerCase())
     );
   }, [orders, searchTerm]);
+
+  const handleRowClick = async (order: PurchaseOrderItem) => {
+    setSelectedOrder(order);
+    setReceiveQty(0);
+    setStockDetail(null);
+    
+    try {
+      const detail = await apiService.stocks.getDetail(order.stockCode);
+      if (detail) setStockDetail(detail);
+    } catch (e) {
+      console.error('Stock detail error:', e);
+    }
+  };
 
   const handleReceive = async () => {
     if(!selectedOrder || receiveQty <= 0) return;
@@ -152,7 +168,7 @@ const PurchaseOrder: React.FC = () => {
                   <td colSpan={6} className="px-6 py-12 text-center text-slate-400 italic">Kayıt bulunamadı.</td>
                 </tr>
               ) : filteredOrders.map((o) => (
-                <tr key={o.id} className="hover:bg-emerald-50/20 transition-all group">
+                <tr key={o.id} onDoubleClick={() => handleRowClick(o)} className="hover:bg-emerald-50/20 transition-all group cursor-pointer">
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-4">
                       <div className="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center text-slate-400 border border-slate-100 group-hover:text-emerald-600 transition-colors">
@@ -212,7 +228,7 @@ const PurchaseOrder: React.FC = () => {
                   <td className="px-6 py-4 text-right">
                     <div className="flex items-center justify-end gap-2">
                        <button 
-                         onClick={() => setSelectedOrder(o)}
+                         onClick={() => handleRowClick(o)}
                          className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 text-emerald-600 rounded-xl text-[10px] font-black hover:bg-emerald-600 hover:text-white transition-all active:scale-95 border border-emerald-100 uppercase"
                        >
                           <ArrowDownCircle size={14} /> GİRİŞ YAP
@@ -228,132 +244,176 @@ const PurchaseOrder: React.FC = () => {
       </div>
 
       {selectedOrder && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-2xl rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in duration-300 flex flex-col max-h-[90vh]">
-            <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-emerald-50/50 shrink-0">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 lg:p-0">
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setSelectedOrder(null)}
+            className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
+          />
+          
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 20 }}
+            className="relative w-full max-w-4xl bg-white rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col"
+          >
+            <div className="p-8 pb-4 flex items-center justify-between">
               <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-emerald-600 rounded-2xl flex items-center justify-center text-white">
-                  <ArrowDownCircle size={24} />
+                <div className="w-14 h-14 bg-emerald-100 rounded-2xl flex items-center justify-center text-emerald-600">
+                  <ArrowDownCircle size={32} />
                 </div>
                 <div>
-                  <h3 className="text-xl font-black text-slate-800 tracking-tight">Alış İrsaliyesi Girişi</h3>
-                  <div className="flex items-center gap-2">
-                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Sipariş ID: {selectedOrder.id}</p>
-                    <span className="text-slate-300">•</span>
-                    <p className="text-[10px] text-indigo-600 font-black uppercase tracking-widest">{selectedOrder.supplierName}</p>
-                  </div>
+                  <h2 className="text-2xl font-black text-slate-800 tracking-tight">Alış İrsaliyesi Girişi</h2>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                     SİPARİŞ ID: {selectedOrder.id} <span className="w-1 h-1 rounded-full bg-slate-200" /> {selectedOrder.supplierName}
+                  </p>
                 </div>
               </div>
-              <button onClick={() => setSelectedOrder(null)} className="text-slate-400 hover:text-rose-500 p-2.5 hover:bg-rose-50 rounded-2xl transition-all">
+              <button 
+                onClick={() => setSelectedOrder(null)}
+                className="p-3 hover:bg-slate-100 rounded-full text-slate-400 transition-colors"
+              >
                 <XCircle size={24} />
               </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto custom-scrollbar p-8 space-y-8">
-               <div className="grid grid-cols-2 gap-8">
-                  <div className="space-y-4">
-                     <div className="bg-slate-50 p-6 rounded-[2rem] border border-slate-100 space-y-3">
-                        <div className="flex items-center justify-between">
-                           <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Sipariş Bilgisi</h4>
-                           {selectedOrder.isRevised && <span className="text-[8px] font-black text-amber-600 uppercase bg-amber-50 px-1.5 py-0.5 rounded border border-amber-100">REVİZE EDİLDİ</span>}
-                        </div>
-                        <div className="flex items-center gap-3">
-                           <div className="w-8 h-8 bg-white border border-slate-200 rounded-lg flex items-center justify-center text-emerald-600"><Package size={16}/></div>
-                           <p className="text-sm font-black text-slate-800">{selectedOrder.stockName}</p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                           <span className="px-2 py-0.5 bg-indigo-50 text-indigo-600 rounded text-[9px] font-black font-mono">{selectedOrder.stockCode}</span>
-                           <span className="text-[9px] font-bold text-slate-400 flex items-center gap-1 uppercase">
-                              <Building size={10} /> {selectedOrder.branchName}
-                           </span>
-                        </div>
-                     </div>
-
-                     <div className="bg-slate-900 p-6 rounded-[2rem] text-white space-y-3">
-                        <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Pazar Karar Desteği</p>
-                        <div className="space-y-1">
-                           <p className="text-[9px] font-bold text-slate-400 uppercase">Son Alınan Fiyat</p>
-                           <h5 className="text-2xl font-black text-indigo-400">${selectedOrder.lastPurchasePrice.toFixed(2)}</h5>
-                        </div>
-                        <div className="flex items-center gap-2 text-[10px] font-medium text-slate-400 italic">
-                           <Truck size={12} /> {selectedOrder.lastSupplier}
-                        </div>
-                     </div>
+            <div className="px-8 py-4 grid grid-cols-1 lg:grid-cols-2 gap-8 overflow-y-auto custom-scrollbar max-h-[60vh]">
+              {/* Left Side: Order Info */}
+              <div className="space-y-6">
+                <div className="bg-slate-50 p-6 rounded-3xl border border-slate-100 space-y-4">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Sipariş Bilgisi</p>
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 bg-white rounded-xl shadow-sm flex items-center justify-center text-emerald-600 border border-slate-100">
+                      <Package size={24} />
+                    </div>
+                    <div>
+                      <h4 className="text-lg font-black text-slate-800 leading-none">{selectedOrder.stockName}</h4>
+                      <div className="flex items-center gap-2 mt-2">
+                        <span className="px-2 py-0.5 bg-indigo-50 text-indigo-600 text-[10px] font-bold rounded border border-indigo-100 uppercase">{selectedOrder.stockCode}</span>
+                        <span className="flex items-center gap-1 text-[10px] text-slate-400 font-bold uppercase"><Building size={12} /> {selectedOrder.branchName}</span>
+                      </div>
+                    </div>
                   </div>
+                </div>
 
-                  <div className="space-y-6">
-                     <div className="bg-emerald-50 p-6 rounded-[2rem] border border-emerald-100 text-center space-y-2">
-                        <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">Beklenen Miktar</p>
-                        <h4 className="text-4xl font-black text-emerald-700 tracking-tighter">{selectedOrder.balance.toLocaleString()}</h4>
-                        <span className="text-[10px] font-black text-emerald-500 uppercase">ADET KALAN</span>
-                     </div>
+                <div className="bg-slate-900 p-6 rounded-3xl text-white relative overflow-hidden group">
+                   <div className="relative z-10 space-y-4">
+                      <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">Pazar Karar Desteği</p>
+                      <div>
+                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter mb-1">Son Alınan Fiyat</p>
+                        <div className="flex items-end gap-2">
+                          <span className="text-3xl font-black text-white">${stockDetail?.lastPurchasePrice || selectedOrder.lastPurchasePrice || '0.00'}</span>
+                          <span className="text-[10px] text-emerald-400 font-bold mb-1 flex items-center gap-0.5"><TrendingDown size={12} /> %1.2 DÜŞÜŞ</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 text-xs font-medium text-slate-400 border-t border-white/10 pt-4">
+                         <Truck size={14} className="text-indigo-400" />
+                         {selectedOrder.supplierName}
+                      </div>
+                   </div>
+                   <div className="absolute top-0 right-0 p-8 opacity-10 rotate-12 group-hover:scale-110 transition-transform duration-500">
+                      <Loader2 size={120} />
+                   </div>
+                </div>
 
-                     <div className="space-y-2">
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Gelen (Fiili) Miktar</label>
-                        <input 
-                           type="number" 
-                           className="w-full px-5 py-4 bg-slate-50 border-2 border-slate-200 rounded-2xl text-2xl font-black text-center text-emerald-600 outline-none focus:border-emerald-500 transition-all"
-                           placeholder="0.00"
-                           value={receiveQty}
-                           onChange={(e) => setReceiveQty(parseFloat(e.target.value) || 0)}
-                        />
-                     </div>
+                <div className="space-y-3">
+                   <div className="flex items-center justify-between px-2">
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                        <History size={14} /> Teslimat Geçmişi
+                      </p>
+                   </div>
+                   <div className="bg-slate-50 rounded-3xl border border-slate-100 overflow-hidden max-h-40 overflow-y-auto">
+                      <table className="w-full text-left text-[10px]">
+                         <thead>
+                            <tr className="bg-slate-100/50 border-b border-slate-200">
+                               <th className="px-5 py-3 font-black text-slate-400 uppercase">Tarih</th>
+                               <th className="px-5 py-3 font-black text-slate-400 uppercase text-center">Miktar</th>
+                               <th className="px-5 py-3 font-black text-slate-400 uppercase text-right">Kayıt</th>
+                            </tr>
+                         </thead>
+                         <tbody className="divide-y divide-slate-100">
+                            {selectedOrder.deliveries.length > 0 ? selectedOrder.deliveries.map((d, i) => (
+                               <tr key={i} className="hover:bg-white transition-colors">
+                                  <td className="px-5 py-3 font-bold text-slate-600">{d.date}</td>
+                                  <td className="px-5 py-3 font-black text-emerald-600 text-center">{d.quantity}</td>
+                                  <td className="px-5 py-3 text-slate-400 text-right">{d.receivedBy}</td>
+                               </tr>
+                            )) : (
+                               <tr>
+                                  <td colSpan={3} className="px-5 py-8 text-center text-slate-400 italic">Henüz bir teslimat kaydı bulunmamaktadır.</td>
+                               </tr>
+                            )}
+                         </tbody>
+                      </table>
+                   </div>
+                </div>
+              </div>
+
+              {/* Right Side: Quantity Input */}
+              <div className="flex flex-col gap-6">
+                <div className="flex-1 bg-emerald-50/50 border border-emerald-100 rounded-3xl p-8 flex flex-col items-center justify-center text-center">
+                  <p className="text-[10px] font-black text-emerald-600 uppercase tracking-[0.2em] mb-4 text-center">Beklenen Miktar</p>
+                  <div className="flex items-end gap-2 leading-none">
+                     <span className="text-[72px] font-black text-emerald-600 tracking-tighter">{selectedOrder.balance.toLocaleString()}</span>
                   </div>
-               </div>
+                  <p className="text-[10px] font-black text-emerald-500 uppercase tracking-widest mt-2">{selectedOrder.unit} KALAN</p>
+                </div>
 
-               <div className="space-y-4">
-                  <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                     <History size={14} /> Teslimat Geçmişi
-                  </h4>
-                  <div className="bg-slate-50 rounded-[2rem] border border-slate-100 overflow-hidden">
-                     <table className="w-full text-left text-xs">
-                        <thead>
-                           <tr className="bg-slate-100/50 border-b border-slate-200">
-                              <th className="px-6 py-3 font-black text-slate-400 uppercase">Tarih</th>
-                              <th className="px-6 py-3 font-black text-slate-400 uppercase text-center">Gelen</th>
-                              <th className="px-6 py-3 font-black text-slate-400 uppercase text-right">Teslim Alan</th>
-                           </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">
-                           {selectedOrder.deliveries.length > 0 ? selectedOrder.deliveries.map((d, i) => (
-                              <tr key={i}>
-                                 <td className="px-6 py-3 font-bold text-slate-600">{d.date}</td>
-                                 <td className="px-6 py-3 font-black text-emerald-600 text-center">{d.quantity}</td>
-                                 <td className="px-6 py-3 text-slate-500 text-right">{d.receivedBy}</td>
-                              </tr>
-                           )) : (
-                              <tr>
-                                 <td colSpan={3} className="px-6 py-8 text-center text-slate-400 italic">Henüz bir teslimat kaydı bulunmamaktadır.</td>
-                              </tr>
-                           )}
-                        </tbody>
-                     </table>
-                  </div>
-               </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Gelen (Fiili) Miktar</label>
+                  <input 
+                    type="number"
+                    autoFocus
+                    className="w-full px-8 py-6 bg-slate-50 border border-slate-200 rounded-3xl text-3xl font-black text-slate-800 outline-none focus:bg-white focus:ring-8 focus:ring-emerald-500/10 focus:border-emerald-500 transition-all text-center"
+                    value={receiveQty || ''}
+                    onChange={(e) => setReceiveQty(parseFloat(e.target.value) || 0)}
+                    placeholder="0"
+                  />
+                </div>
+              </div>
             </div>
 
-            <div className="p-8 bg-slate-50 border-t border-slate-100 flex items-center justify-between shrink-0">
-               <div>
-                  <a 
-                    href="#/alis-irsaliye" 
-                    className="flex items-center gap-2 text-[10px] font-black text-indigo-500 hover:text-indigo-700 uppercase tracking-widest transition-all"
-                  >
-                    <ExternalLink size={14} /> Detaylı İrsaliye Ekranına Git
-                  </a>
-               </div>
-               <div className="flex gap-3">
-                  <button onClick={() => setSelectedOrder(null)} className="px-6 py-4 text-xs font-black text-slate-400 hover:text-slate-600 uppercase tracking-widest transition-all">İptal</button>
-                  <button 
-                     onClick={handleReceive}
-                     disabled={isSaving || receiveQty <= 0}
-                     className="px-10 py-4 bg-emerald-600 text-white text-xs font-black rounded-2xl hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-100 flex items-center gap-3 uppercase tracking-[0.1em] disabled:opacity-50"
-                  >
-                     {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save size={18} />}
-                     Girişi Onayla
-                  </button>
-               </div>
+            <div className="p-8 border-t border-slate-100 flex items-center justify-between">
+              <button 
+                onClick={() => {
+                    if (!selectedOrder) return;
+                    const lineNo = selectedOrder.id.split('-').pop();
+                    navigate('/alis-irsaliye', { 
+                      state: { 
+                        orderNo: selectedOrder.id.split('-')[0],
+                        orderLineNo: lineNo,
+                        stockCode: selectedOrder.stockCode,
+                        customerCode: selectedOrder.customerCode,
+                        qty: receiveQty > 0 ? receiveQty : selectedOrder.balance
+                      } 
+                    });
+                }}
+                className="flex items-center gap-2 text-indigo-600 hover:text-indigo-700 font-black text-[11px] uppercase tracking-widest transition-colors group"
+              >
+                <ExternalLink size={18} className="group-hover:-translate-y-0.5 transition-transform" />
+                DETAYLI İRSALİYE EKRANINA GİT
+              </button>
+              
+              <div className="flex items-center gap-4">
+                <button 
+                  onClick={() => setSelectedOrder(null)}
+                  className="px-8 py-4 text-[11px] font-black text-slate-400 uppercase tracking-widest hover:text-slate-600 transition-colors"
+                >
+                  İPTAL
+                </button>
+                <button 
+                  onClick={handleReceive}
+                  disabled={isSaving || receiveQty <= 0}
+                  className="flex items-center gap-3 bg-emerald-600 hover:bg-emerald-700 text-white px-10 py-4 rounded-2xl font-black text-[11px] uppercase tracking-[0.2em] shadow-xl shadow-emerald-100 transition-all active:scale-95 disabled:opacity-50"
+                >
+                  {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save size={18} />}
+                  GİRİŞİ ONAYLA
+                </button>
+              </div>
             </div>
-          </div>
+          </motion.div>
         </div>
       )}
     </div>
