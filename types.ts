@@ -324,6 +324,7 @@ export interface InvoiceItem {
     id: string;
     stockCode: string;
     stockName: string;
+    unit?: string;
     loadingDate: string;
     deliveryDate: string;
     conversion: number;
@@ -492,6 +493,7 @@ export interface StockWarehouseBalance {
 
 export interface PurchaseRequisition {
     id: string;
+    requestNo: string;
     stockCode: string;
     stockName: string;
     branchName: string;
@@ -502,6 +504,7 @@ export interface PurchaseRequisition {
     date: string;
     status: string;
     isRevised: boolean;
+    description?: string;
 }
 
 export interface DeliveryHistory {

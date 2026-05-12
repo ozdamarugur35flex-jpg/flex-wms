@@ -52,6 +52,7 @@ import SerialMovementAnalysis from './pages/SerialMovementAnalysis';
 import LabelPrintReport from './pages/LabelPrintReport';
 import PurchaseRequisition from './pages/PurchaseRequisition';
 import PurchaseOrder from './pages/PurchaseOrder';
+import PurchaseApproval from './pages/PurchaseApproval';
 import SpreadsheetModule from './pages/SpreadsheetModule';
 import OrderBreakdownReport from './pages/OrderBreakdownReport';
 import OperationalOrderTracking from './pages/OperationalOrderTracking';
@@ -144,6 +145,7 @@ const AppContent: React.FC = () => {
       title: "Satınalma & Giriş",
       items: [
         { id: 'satinalma-talep', label: 'Satınalma Talepleri', icon: <FilePlus size={18} />, path: '/satinalma-talep' },
+        { id: 'satinalma-onay', label: 'Satınalma Onayı', icon: <CheckCircle2 size={18} className="text-emerald-500" />, path: '/satinalma-onay' },
         { id: 'satinalma-siparis', label: 'Satınalma Siparişleri', icon: <ShoppingCart size={18} />, path: '/satinalma-siparis' },
         { id: 'malzeme-takip', label: 'Malzeme Sipariş Durum', icon: <PackageSearch size={18} />, path: '/malzeme-siparis-durum' },
         { id: 'min-stok', label: 'Minimum Stok Listesi', icon: <MinusCircle size={18} />, path: '/min-stok' },
@@ -297,6 +299,7 @@ const AppContent: React.FC = () => {
             <Route path="/stok-kart" element={<StockList />} />
             <Route path="/siparis-kirilim" element={<OrderBreakdownReport />} />
             <Route path="/satinalma-talep" element={<PurchaseRequisition />} />
+            <Route path="/satinalma-onay" element={<PurchaseApproval />} />
             <Route path="/satinalma-siparis" element={<PurchaseOrder />} />
             <Route path="/cari-kart" element={<CustomerList />} />
             <Route path="/depo-tanim" element={<WarehouseList />} />

@@ -23,7 +23,8 @@ import {
   Database,
   Building,
   Edit,
-  Loader2
+  Loader2,
+  ExternalLink
 } from 'lucide-react';
 import { PurchaseOrderItem, DeliveryHistory } from '../types';
 import { apiService } from '../api';
@@ -39,7 +40,7 @@ const PurchaseOrder: React.FC = () => {
   const fetchData = async () => {
     setIsLoading(true);
     try {
-      const orderList = await apiService.purchaseOrders.getAll();
+      const orderList = await apiService.purchaseOrders.getEntries();
       setOrders(orderList);
     } catch (error) {
       console.error('Data fetch error:', error);
@@ -75,6 +76,9 @@ const PurchaseOrder: React.FC = () => {
 
       const result = await apiService.purchaseOrders.save(payload);
       if (result.success) {
+        if (result.irsNo) {
+          alert(`Alış İrsaliyesi başarıyla oluşturuldu: ${result.irsNo}`);
+        }
         await fetchData();
         setSelectedOrder(null);
         setReceiveQty(0);
@@ -232,8 +236,12 @@ const PurchaseOrder: React.FC = () => {
                   <ArrowDownCircle size={24} />
                 </div>
                 <div>
-                  <h3 className="text-xl font-black text-slate-800 tracking-tight">Malzeme Kabul Girişi</h3>
-                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Sipariş ID: {selectedOrder.id}</p>
+                  <h3 className="text-xl font-black text-slate-800 tracking-tight">Alış İrsaliyesi Girişi</h3>
+                  <div className="flex items-center gap-2">
+                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Sipariş ID: {selectedOrder.id}</p>
+                    <span className="text-slate-300">•</span>
+                    <p className="text-[10px] text-indigo-600 font-black uppercase tracking-widest">{selectedOrder.supplierName}</p>
+                  </div>
                 </div>
               </div>
               <button onClick={() => setSelectedOrder(null)} className="text-slate-400 hover:text-rose-500 p-2.5 hover:bg-rose-50 rounded-2xl transition-all">
@@ -324,16 +332,26 @@ const PurchaseOrder: React.FC = () => {
                </div>
             </div>
 
-            <div className="p-8 bg-slate-50 border-t border-slate-100 flex justify-end gap-3 shrink-0">
-               <button onClick={() => setSelectedOrder(null)} className="text-xs font-black text-slate-400 hover:text-slate-600 uppercase tracking-widest transition-all">İptal</button>
-               <button 
-                  onClick={handleReceive}
-                  disabled={isSaving || receiveQty <= 0}
-                  className="px-10 py-4 bg-emerald-600 text-white text-xs font-black rounded-2xl hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-100 flex items-center gap-3 uppercase tracking-[0.1em] disabled:opacity-50"
-               >
-                  {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save size={18} />}
-                  Girişi Onayla
-               </button>
+            <div className="p-8 bg-slate-50 border-t border-slate-100 flex items-center justify-between shrink-0">
+               <div>
+                  <a 
+                    href="#/alis-irsaliye" 
+                    className="flex items-center gap-2 text-[10px] font-black text-indigo-500 hover:text-indigo-700 uppercase tracking-widest transition-all"
+                  >
+                    <ExternalLink size={14} /> Detaylı İrsaliye Ekranına Git
+                  </a>
+               </div>
+               <div className="flex gap-3">
+                  <button onClick={() => setSelectedOrder(null)} className="px-6 py-4 text-xs font-black text-slate-400 hover:text-slate-600 uppercase tracking-widest transition-all">İptal</button>
+                  <button 
+                     onClick={handleReceive}
+                     disabled={isSaving || receiveQty <= 0}
+                     className="px-10 py-4 bg-emerald-600 text-white text-xs font-black rounded-2xl hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-100 flex items-center gap-3 uppercase tracking-[0.1em] disabled:opacity-50"
+                  >
+                     {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save size={18} />}
+                     Girişi Onayla
+                  </button>
+               </div>
             </div>
           </div>
         </div>

@@ -124,6 +124,7 @@ const mapPurchaseRequestData = (item: any) => {
     stockCode: item.stockCode || item.StockCode || '',
     stockName: item.stockName || item.StockName || '',
     requestedQty: Number(item.requestedQty ?? item.RequestedQty ?? 0),
+    currentStock: Number(item.currentStock ?? item.CurrentStock ?? 0),
     branchName: item.branchName || item.BranchName || '',
     items: Array.isArray(item.items || item.Items) ? (item.items || item.Items).map((line: any) => ({
       id: line.id || line.Id || Math.random().toString(36).substr(2, 9),
@@ -135,6 +136,28 @@ const mapPurchaseRequestData = (item: any) => {
       description: line.description || line.Description || '',
       status: line.status || line.Status || 'Bekliyor',
     })) : []
+  };
+};
+
+const mapPurchaseOrderItemData = (item: any) => {
+  if (!item) return item;
+  return {
+    id: item.id || item.Id || '',
+    orderNo: item.orderNo || item.OrderNo || '',
+    requisitionId: item.requisitionId || item.RequisitionId || '',
+    stockCode: item.stockCode || item.StockCode || '',
+    stockName: item.stockName || item.StockName || '',
+    branchName: item.branchName || item.BranchName || '',
+    supplierName: item.supplierName || item.SupplierName || '',
+    orderedQty: Number(item.orderedQty ?? item.OrderedQty ?? 0),
+    receivedQty: Number(item.receivedQty ?? item.ReceivedQty ?? 0),
+    balance: Number(item.balance ?? item.Balance ?? 0),
+    lastPurchasePrice: Number(item.lastPurchasePrice ?? item.LastPurchasePrice ?? 0),
+    lastSupplier: item.lastSupplier || item.LastSupplier || '',
+    unit: item.unit || item.Unit || 'ADET',
+    status: item.status || item.Status || 'Açık',
+    isRevised: !!(item.isRevised || item.IsRevised),
+    deliveries: Array.isArray(item.deliveries || item.Deliveries) ? (item.deliveries || item.Deliveries) : []
   };
 };
 
@@ -310,6 +333,26 @@ const mapStockData = (item: any) => {
   };
 };
 
+const mapMaterialOrderTrackingData = (item: any) => {
+  if (!item) return item;
+  return {
+    id: item.id || item.Id || '',
+    orderNo: item.orderNo || item.OrderNo || '',
+    stockCode: item.stockCode || item.StockCode || '',
+    stockName: item.stockName || item.StockName || '',
+    supplierCode: item.supplierCode || item.SupplierCode || '',
+    supplierName: item.supplierName || item.SupplierName || '',
+    orderDate: item.orderDate || item.OrderDate || '',
+    orderedQuantity: Number(item.orderedQuantity ?? item.OrderedQuantity ?? 0),
+    receivedQuantity: Number(item.receivedQuantity ?? item.ReceivedQuantity ?? 0),
+    remainingQuantity: Number(item.remainingQuantity ?? item.RemainingQuantity ?? 0),
+    unit: item.unit || item.Unit || 'ADET',
+    status: item.status || item.Status || 'Açık',
+    lastDeliveryDate: item.lastDeliveryDate || item.LastDeliveryDate || '',
+    lastWaybillNo: item.lastWaybillNo || item.LastWaybillNo || '',
+  };
+};
+
 // --- API SERVICE ---
 
 export const apiService = {
@@ -390,16 +433,31 @@ export const apiService = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(items)
     }, { success: true }),
+    updateStatus: (requestNos: string[], newStatus: string, reason?: string) => request(`${API_BASE_URL}/purchaserequests/update-status`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ requestNos, newStatus, reason })
+    }, { success: true }),
+    updateItemQty: (requestNo: string, stockCode: string, newQty: number) => request(`${API_BASE_URL}/purchaserequests/update-item-qty`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ requestNo, stockCode, newQty })
+    }, { success: true }),
     delete: (requestNo: string) => request(`${API_BASE_URL}/purchaserequests/${requestNo}`, { method: 'DELETE' }, { success: true }),
     convertToOrder: (requestNo: string, customerCode: string) => request(`${API_BASE_URL}/purchaserequests/${requestNo}/convert-to-order`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ customerCode })
     }, { success: true }),
+    cancelConversion: (requestNo: string) => request(`${API_BASE_URL}/purchaserequests/${requestNo}/cancel-conversion`, {
+      method: 'POST'
+    }, { success: true }),
+    getPreviousSuppliers: (requestNo: string) => request(`${API_BASE_URL}/purchaserequests/${requestNo}/previous-suppliers`, undefined, []),
   },
 
   purchaseOrders: {
     getAll: () => request(`${API_BASE_URL}/purchaseorders`, undefined, [], mapPurchaseOrderData),
+    getEntries: () => request(`${API_BASE_URL}/purchaseorders`, undefined, [], mapPurchaseOrderItemData),
     getDetail: (orderNo: string) => request(`${API_BASE_URL}/purchaseorders/${orderNo}`, undefined, null, mapPurchaseOrderData),
     save: (data: any) => request(`${API_BASE_URL}/purchaseorders`, {
       method: 'POST',
@@ -432,7 +490,7 @@ export const apiService = {
   },
 
   materialOrderTracking: {
-    getAll: () => request(`${API_BASE_URL}/material-order-tracking`, undefined, []),
+    getAll: () => request(`${API_BASE_URL}/material-order-tracking`, undefined, [], mapMaterialOrderTrackingData),
   },
 
   customerOrders: {

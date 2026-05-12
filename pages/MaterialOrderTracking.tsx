@@ -1,5 +1,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { motion, AnimatePresence } from 'motion/react';
 import { 
   PackageSearch, 
   RotateCcw, 
@@ -14,17 +16,33 @@ import {
   BadgeAlert,
   ArrowRightCircle,
   Loader2,
-  AlertCircle
+  AlertCircle,
+  X,
+  TrendingDown,
+  Info,
+  ChevronRight,
+  Save,
+  ExternalLink,
+  FileDown,
+  LayoutGrid,
+  History
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { MaterialOrderStatus } from '../types';
 import { apiService } from '../api';
 
 const MaterialOrderTracking: React.FC = () => {
+  const navigate = useNavigate();
   const [orders, setOrders] = useState<MaterialOrderStatus[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState<'Tümü' | 'Açık' | 'Geciken'>('Tümü');
+  
+  // Modal State
+  const [selectedOrder, setSelectedOrder] = useState<MaterialOrderStatus | null>(null);
+  const [quickQty, setQuickQty] = useState(0);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [stockDetail, setStockDetail] = useState<any>(null);
 
   useEffect(() => {
     fetchData();
@@ -40,6 +58,82 @@ const MaterialOrderTracking: React.FC = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleRowClick = async (order: MaterialOrderStatus) => {
+    setSelectedOrder(order);
+    setQuickQty(0);
+    setStockDetail(null);
+    
+    // Fetch last price etc.
+    try {
+      const detail = await apiService.stocks.getDetail(order.stockCode);
+      if (detail) setStockDetail(detail);
+    } catch (e) {
+      console.error('Stock detail error:', e);
+    }
+  };
+
+  const handleQuickSubmit = async () => {
+    if (!selectedOrder || quickQty <= 0) return;
+    setIsSubmitting(true);
+    try {
+      // Create a payload for Alış İrsaliyesi
+      // We generate a temp invoice no or let the backend ignore it if we add a "Quick" flag, 
+      // but standard Save is better.
+      const nextNoResult = await apiService.purchaseInvoices.generateNextNo();
+      const invoiceNo = nextNoResult.nextNo || `T-${Date.now()}`;
+
+      const lineNo = selectedOrder.id.split('-').pop();
+      const payload = {
+        invoiceNo,
+        customerCode: selectedOrder.supplierCode,
+        customerName: selectedOrder.supplierName,
+        date: new Date().toISOString().split('T')[0],
+        deliveryDate: new Date().toISOString().split('T')[0],
+        description: `Hızlı Giriş - Sipariş: ${selectedOrder.orderNo}`,
+        type: 'YURT İÇİ',
+        items: [{
+          id: Math.random().toString(36).substr(2, 9),
+          stockCode: selectedOrder.stockCode,
+          stockName: selectedOrder.stockName,
+          quantity: quickQty,
+          price: stockDetail?.lastPurchasePrice || 0,
+          unit: selectedOrder.unit,
+          warehouseCode: '01',
+          orderNo: selectedOrder.orderNo,
+          orderLineNo: lineNo
+        }]
+      };
+
+      const result = await apiService.purchaseInvoices.save(payload);
+      if (result.success) {
+        alert(`Başarılı: ${selectedOrder.orderNo} için ${quickQty} birim giriş yapıldı ve ${invoiceNo} nolu irsaliye oluşturuldu.`);
+        setSelectedOrder(null);
+        fetchData();
+      } else {
+        alert('Giriş yapılırken bir sorun oluştu.');
+      }
+    } catch (error) {
+      console.error('Quick submit error:', error);
+      alert('Sistem hatası oluştu.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const goToDetailedInvoice = () => {
+    if (!selectedOrder) return;
+    const lineNo = selectedOrder.id.split('-').pop();
+    navigate('/alis-irsaliye', { 
+      state: { 
+        orderNo: selectedOrder.orderNo,
+        orderLineNo: lineNo,
+        stockCode: selectedOrder.stockCode,
+        customerCode: selectedOrder.supplierCode,
+        qty: quickQty > 0 ? quickQty : selectedOrder.remainingQuantity
+      } 
+    });
   };
 
   const filteredOrders = useMemo(() => {
@@ -188,7 +282,11 @@ const MaterialOrderTracking: React.FC = () => {
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {filteredOrders.map((order) => (
-                  <tr key={order.id} className="hover:bg-slate-50/50 transition-colors group">
+                  <tr 
+                    key={order.id} 
+                    onClick={() => handleRowClick(order)}
+                    className="hover:bg-slate-50/50 transition-colors group cursor-pointer"
+                  >
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
                         <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${order.status === 'Kapalı' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'}`}>
@@ -258,6 +356,145 @@ const MaterialOrderTracking: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* QUICK RECEIPT MODAL (Screenshot match) */}
+      <AnimatePresence>
+        {selectedOrder && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 lg:p-0">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setSelectedOrder(null)}
+              className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
+            />
+            
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative w-full max-w-4xl bg-white rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col"
+            >
+              <div className="p-8 pb-4 flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="w-14 h-14 bg-emerald-100 rounded-2xl flex items-center justify-center text-emerald-600">
+                    <FileDown size={32} />
+                  </div>
+                  <div>
+                    <h2 className="text-2xl font-black text-slate-800 tracking-tight">Alış İrsaliyesi Girişi</h2>
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                       SİPARİŞ ID: {selectedOrder.orderNo} <span className="w-1 h-1 rounded-full bg-slate-200" /> {selectedOrder.supplierName}
+                    </p>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => setSelectedOrder(null)}
+                  className="p-3 hover:bg-slate-100 rounded-full text-slate-400 transition-colors"
+                >
+                  <X size={24} />
+                </button>
+              </div>
+
+              <div className="px-8 py-4 grid grid-cols-1 lg:grid-cols-2 gap-8">
+                {/* Left Side: Order Info */}
+                <div className="space-y-6">
+                  <div className="bg-slate-50 p-6 rounded-3xl border border-slate-100 space-y-4">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Sipariş Bilgisi</p>
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 bg-white rounded-xl shadow-sm flex items-center justify-center text-emerald-600 border border-slate-100">
+                        <Box size={24} />
+                      </div>
+                      <div>
+                        <h4 className="text-lg font-black text-slate-800 leading-none">{selectedOrder.stockName}</h4>
+                        <div className="flex items-center gap-2 mt-2">
+                          <span className="px-2 py-0.5 bg-indigo-50 text-indigo-600 text-[10px] font-bold rounded border border-indigo-100 uppercase">{selectedOrder.stockCode}</span>
+                          <span className="flex items-center gap-1 text-[10px] text-slate-400 font-bold uppercase"><LayoutGrid size={12} /> MERKEZ</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-slate-900 p-6 rounded-3xl text-white relative overflow-hidden group">
+                     <div className="relative z-10 space-y-4">
+                        <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">Pazar Karar Desteği</p>
+                        <div>
+                          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter mb-1">Son Alınan Fiyat</p>
+                          <div className="flex items-end gap-2">
+                            <span className="text-3xl font-black text-white">${stockDetail?.lastPurchasePrice || '0.05'}</span>
+                            <span className="text-[10px] text-emerald-400 font-bold mb-1 flex items-center gap-0.5"><TrendingDown size={12} /> %1.2 DÜŞÜŞ</span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 text-xs font-medium text-slate-400 border-t border-white/10 pt-4">
+                           <Truck size={14} className="text-indigo-400" />
+                           {selectedOrder.supplierName}
+                        </div>
+                     </div>
+                     <div className="absolute top-0 right-0 p-8 opacity-10 rotate-12 group-hover:scale-110 transition-transform duration-500">
+                        <Loader2 size={120} />
+                     </div>
+                  </div>
+                </div>
+
+                {/* Right Side: Quantity Input */}
+                <div className="flex flex-col gap-6">
+                  <div className="flex-1 bg-emerald-50/50 border border-emerald-100 rounded-3xl p-8 flex flex-col items-center justify-center text-center">
+                    <p className="text-[10px] font-black text-emerald-600 uppercase tracking-[0.2em] mb-4 text-center">Beklenen Miktar</p>
+                    <div className="flex items-end gap-2 leading-none">
+                       <span className="text-[72px] font-black text-emerald-600 tracking-tighter">{selectedOrder.remainingQuantity.toLocaleString()}</span>
+                    </div>
+                    <p className="text-[10px] font-black text-emerald-500 uppercase tracking-widest mt-2">{selectedOrder.unit} KALAN</p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Gelen (Fiili) Miktar</label>
+                    <input 
+                      type="number"
+                      autoFocus
+                      className="w-full px-8 py-6 bg-slate-50 border border-slate-200 rounded-3xl text-3xl font-black text-slate-800 outline-none focus:bg-white focus:ring-8 focus:ring-emerald-500/10 focus:border-emerald-500 transition-all text-center"
+                      value={quickQty || ''}
+                      onChange={(e) => setQuickQty(parseFloat(e.target.value) || 0)}
+                      placeholder="0"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-8 border-t border-slate-100 flex items-center justify-between">
+                <button 
+                  onClick={goToDetailedInvoice}
+                  className="flex items-center gap-2 text-indigo-600 hover:text-indigo-700 font-black text-[11px] uppercase tracking-widest transition-colors group"
+                >
+                  <ExternalLink size={18} className="group-hover:-translate-y-0.5 transition-transform" />
+                  DETAYLI İRSALİYE EKRANINA GİT
+                </button>
+                
+                <div className="flex items-center gap-4">
+                  <button 
+                    onClick={() => setSelectedOrder(null)}
+                    className="px-8 py-4 text-[11px] font-black text-slate-400 uppercase tracking-widest hover:text-slate-600 transition-colors"
+                  >
+                    İPTAL
+                  </button>
+                  <button 
+                    onClick={handleQuickSubmit}
+                    disabled={isSubmitting || quickQty <= 0}
+                    className="flex items-center gap-3 bg-emerald-600 hover:bg-emerald-700 text-white px-10 py-4 rounded-2xl font-black text-[11px] uppercase tracking-[0.2em] shadow-xl shadow-emerald-100 transition-all active:scale-95 disabled:opacity-50"
+                  >
+                    {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save size={18} />}
+                    GİRİŞİ ONAYLA
+                  </button>
+                </div>
+              </div>
+
+              <div className="absolute bottom-4 left-8 pointer-events-none opacity-20">
+                <div className="flex items-center gap-2 text-[9px] font-black uppercase tracking-[0.5em] text-slate-400">
+                  <History size={12} /> TESLİMAT GEÇMİŞİ
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

@@ -111,6 +111,51 @@ async function startServer() {
     }
   ];
 
+  let purchaseRequests: any[] = [
+    {
+      requestNo: 'T0001',
+      stockCode: 'AL-2020',
+      stockName: 'Alüminyum Profil 20x20',
+      requestedQty: 100,
+      date: new Date().toISOString(),
+      branchName: 'Merkez Refo',
+      description: 'Hammadde ihtiyacı',
+      status: 'Onayda',
+      currentStock: 400
+    },
+    {
+      requestNo: 'T0002',
+      stockCode: 'STK-1820',
+      stockName: 'Örnek Stok 1820',
+      requestedQty: 50,
+      date: new Date().toISOString(),
+      branchName: 'Üretim Depo',
+      description: 'Yedek parça',
+      status: 'Beklemede',
+      currentStock: 50
+    }
+  ];
+
+  let purchaseOrders: any[] = [
+    {
+      id: 'S001-1',
+      orderNo: 'S001',
+      stockCode: 'AL-2020',
+      stockName: 'Alüminyum Profil 20x20',
+      supplierName: 'Aksoy Metal Ltd.',
+      customerName: 'Aksoy Metal Ltd.',
+      customerCode: 'C001',
+      branchName: 'Merkez',
+      orderedQty: 500,
+      receivedQty: 0,
+      balance: 500,
+      lastPurchasePrice: 120.50,
+      lastSupplier: 'Aksoy Metal Ltd.',
+      unit: 'ADET',
+      status: 'Açık'
+    }
+  ];
+
   // --- API ROUTES ---
 
   // [GET] /api/stocks
@@ -430,6 +475,97 @@ async function startServer() {
   });
 
   // --- PURCHASE INVOICE API ---
+  app.get("/api/purchaserequests", (req, res) => {
+    res.json(purchaseRequests);
+  });
+
+  app.post("/api/purchaserequests", (req, res) => {
+    const data = req.body;
+    const nextNo = "T" + (purchaseRequests.length + 1).toString().padStart(4, '0');
+    const newReq = { ...data, requestNo: nextNo, status: 'Beklemede', date: new Date().toISOString() };
+    purchaseRequests.push(newReq);
+    res.json({ success: true, requestNo: nextNo });
+  });
+
+  app.post("/api/purchaserequests/bulk", (req, res) => {
+    const items = req.body;
+    const nextNo = "T" + (purchaseRequests.length + 1).toString().padStart(4, '0');
+    items.forEach((item: any) => {
+      purchaseRequests.push({ ...item, requestNo: nextNo, status: 'Beklemede', date: new Date().toISOString() });
+    });
+    res.json({ success: true });
+  });
+
+  app.post("/api/purchaserequests/update-status", (req, res) => {
+    const { requestNos, newStatus, reason } = req.body;
+    purchaseRequests = purchaseRequests.map(r => {
+      if (requestNos.includes(r.requestNo)) {
+        return { ...r, status: newStatus, description: reason ? `${r.description} [RED: ${reason}]` : r.description };
+      }
+      return r;
+    });
+    res.json({ success: true });
+  });
+
+  app.post("/api/purchaserequests/update-item-qty", (req, res) => {
+    const { requestNo, stockCode, newQty } = req.body;
+    purchaseRequests = purchaseRequests.map(r => {
+      if (r.requestNo === requestNo && r.stockCode === stockCode) {
+        return { ...r, requestedQty: newQty };
+      }
+      return r;
+    });
+    res.json({ success: true });
+  });
+
+  app.delete("/api/purchaserequests/:requestNo", (req, res) => {
+    purchaseRequests = purchaseRequests.filter(r => r.requestNo !== req.params.requestNo);
+    res.json({ success: true });
+  });
+
+  app.post("/api/purchaserequests/:requestNo/convert-to-order", (req, res) => {
+    const { requestNo } = req.params;
+    const { customerCode } = req.body;
+    const customer = customers.find(c => c.code === customerCode);
+    
+    const itemsToConvert = purchaseRequests.filter(r => r.requestNo === requestNo);
+    if (itemsToConvert.length === 0) return res.status(404).json({ message: "Talep bulunamadı" });
+
+    const nextOrderNo = "S" + (purchaseOrders.length + 1).toString().padStart(4, '0');
+
+    itemsToConvert.forEach((item, index) => {
+      purchaseOrders.push({
+        id: `${nextOrderNo}-${index + 1}`,
+        orderNo: nextOrderNo,
+        stockCode: item.stockCode,
+        stockName: item.stockName,
+        supplierName: customer?.name || 'Bilinmeyen',
+        customerName: customer?.name || 'Bilinmeyen',
+        customerCode: customerCode,
+        branchName: item.branchName,
+        orderedQty: item.requestedQty,
+        receivedQty: 0,
+        balance: item.requestedQty,
+        lastPurchasePrice: 0,
+        lastSupplier: '',
+        unit: 'ADET',
+        status: 'Açık'
+      });
+    });
+
+    // Update status to 'Sipariş' after conversion
+    purchaseRequests = purchaseRequests.map(r => {
+      if (r.requestNo === requestNo) return { ...r, status: 'Sipariş' };
+      return r;
+    });
+
+    res.json({ success: true, orderNo: nextOrderNo });
+  });
+
+  app.get("/api/purchaseorders", (req, res) => {
+    res.json(purchaseOrders);
+  });
+
   let purchaseInvoices: any[] = [
     {
       id: 'AL-2024001',

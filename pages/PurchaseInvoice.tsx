@@ -1,5 +1,6 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { 
   FileDown, 
   Plus, 
@@ -33,6 +34,9 @@ import SearchableSelect from '../components/SearchableSelect';
 
 const PurchaseInvoice: React.FC = () => {
   const today = new Date().toISOString().split('T')[0];
+  const location = useLocation();
+  const prefillState = location.state as { orderNo: string, orderLineNo: string, stockCode: string, customerCode: string, qty: number } | null;
+  
   const [activeTab, setActiveTab] = useState<'header' | 'lines' | 'history'>('header');
   const [isExtraFieldsOpen, setExtraFieldsOpen] = useState(false);
   const [items, setItems] = useState<InvoiceItem[]>([]);
@@ -83,6 +87,57 @@ const PurchaseInvoice: React.FC = () => {
     };
     fetchData();
   }, []);
+
+  // Prefill Logic
+  useEffect(() => {
+    if (prefillState && customers.length > 0 && stocks.length > 0) {
+      const customer = customers.find(c => 
+        c.code.trim().toUpperCase() === prefillState.customerCode.trim().toUpperCase()
+      );
+      const stock = stocks.find(s => 
+        s.code.trim().toUpperCase() === prefillState.stockCode.trim().toUpperCase()
+      );
+      
+      if (customer) {
+        setInvoiceHeader(prev => ({
+          ...prev,
+          customerCode: customer.code,
+          customerName: customer.name,
+          description: `Sipariş No: ${prefillState.orderNo} istinaden`
+        }));
+      } else {
+        setInvoiceHeader(prev => ({
+          ...prev,
+          customerCode: prefillState.customerCode,
+          customerName: 'BELİRSİZ CARİ (' + prefillState.customerCode + ')',
+          description: `Sipariş No: ${prefillState.orderNo} istinaden`
+        }));
+      }
+
+      if (stock) {
+        const newLine: InvoiceItem = {
+          id: Math.random().toString(36).substr(2, 9),
+          stockCode: stock.code,
+          stockName: stock.name,
+          quantity: prefillState.qty,
+          unit: stock.unit1,
+          price: stock.lastPurchasePrice || 0,
+          vat: stock.purchaseVat || 20,
+          total: (prefillState.qty * (stock.lastPurchasePrice || 0)) * (1 + (stock.purchaseVat || 20) / 100),
+          loadingDate: today,
+          deliveryDate: today,
+          conversion: 1,
+          currencyType: 'TL',
+          currencyPrice: stock.lastPurchasePrice || 0,
+          exchangeRate: 1,
+          warehouseCode: '01',
+          orderNo: prefillState.orderNo,
+          orderLineNo: parseInt(prefillState.orderLineNo)
+        };
+        setItems([newLine]);
+      }
+    }
+  }, [prefillState, customers, stocks]);
 
   useEffect(() => {
     if (activeTab === 'history') {
@@ -198,6 +253,20 @@ const PurchaseInvoice: React.FC = () => {
       price: 0,
       vat: 20
     });
+  };
+
+  const handleUpdateItem = (id: string, field: keyof InvoiceItem, value: any) => {
+    setItems(prev => prev.map(item => {
+      if (item.id === id) {
+        const updatedItem = { ...item, [field]: value };
+        // Recalculate total for this item
+        if (field === 'quantity' || field === 'price' || field === 'vat') {
+          updatedItem.total = (updatedItem.quantity * updatedItem.price) * (1 + (updatedItem.vat || 20) / 100);
+        }
+        return updatedItem;
+      }
+      return item;
+    }));
   };
 
   const handleRemoveLine = (id: string) => {
@@ -662,10 +731,26 @@ const PurchaseInvoice: React.FC = () => {
                              </td>
                              <td className="px-6 py-4 text-center text-xs font-black text-slate-500 uppercase tracking-widest">{item.warehouseCode}</td>
                              <td className="px-6 py-4 text-center">
-                                <span className="text-sm font-black text-slate-700">{item.quantity.toLocaleString()}</span>
+                                <input 
+                                  type="number"
+                                  className="w-24 px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg text-center text-sm font-black text-slate-700 focus:border-emerald-500 outline-none transition-all"
+                                  value={item.quantity}
+                                  disabled={!canEdit}
+                                  onChange={(e) => handleUpdateItem(item.id, 'quantity', parseFloat(e.target.value) || 0)}
+                                />
                              </td>
                              <td className="px-6 py-4 text-center">
-                                <span className="text-sm font-black text-slate-600">₺{item.price.toFixed(2)}</span>
+                                <div className="flex items-center justify-center gap-1">
+                                  <span className="text-slate-400 text-xs">₺</span>
+                                  <input 
+                                    type="number"
+                                    className="w-24 px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg text-center text-sm font-black text-slate-600 focus:border-emerald-500 outline-none transition-all"
+                                    value={item.price || ''}
+                                    placeholder="0.00"
+                                    disabled={!canEdit}
+                                    onChange={(e) => handleUpdateItem(item.id, 'price', parseFloat(e.target.value) || 0)}
+                                  />
+                                </div>
                              </td>
                              <td className="px-6 py-4 text-right">
                                 <p className="text-xs font-bold text-slate-400">₺{((item.price * item.quantity) * item.vat / 100).toLocaleString()}</p>

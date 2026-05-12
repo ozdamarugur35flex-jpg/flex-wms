@@ -24,7 +24,8 @@ import {
   History,
   FileSpreadsheet,
   Loader2,
-  RefreshCcw
+  RefreshCcw,
+  Minus
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { PurchaseRequisition as IReq, StockCard } from '../types';
@@ -43,16 +44,20 @@ const PurchaseRequisition: React.FC = () => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [selectedNos, setSelectedNos] = useState<string[]>([]);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [activeTab, setActiveTab] = useState<'active' | 'history'>('active');
 
   const fetchData = async () => {
     setIsLoading(true);
     try {
       const [reqList, stockList] = await Promise.all([
         apiService.purchaseRequests.getAll(),
-        apiService.stocks.getMinLevels() // Miktarları doğru almak için getMinLevels kullanıyoruz
+        apiService.stocks.getMinLevels()
       ]);
       setReqs(reqList);
       setStocks(stockList);
+      setSelectedNos([]);
     } catch (error) {
       console.error('Data fetch error:', error);
     } finally {
@@ -65,12 +70,20 @@ const PurchaseRequisition: React.FC = () => {
   }, []);
 
   const filteredReqs = useMemo(() => {
-    return (reqs || []).filter(r => 
+    let baseReqs = reqs || [];
+    
+    if (activeTab === 'active') {
+      baseReqs = baseReqs.filter(r => r.status === 'Beklemede' || r.status === 'A');
+    } else {
+      baseReqs = baseReqs.filter(r => r.status !== 'Beklemede' && r.status !== 'A');
+    }
+
+    return baseReqs.filter(r => 
       (r?.stockName?.toLowerCase() || '').includes(searchTerm.toLowerCase()) || 
       (r?.stockCode?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
       (r?.requestNo?.toLowerCase() || '').includes(searchTerm.toLowerCase())
     );
-  }, [reqs, searchTerm]);
+  }, [reqs, searchTerm, activeTab]);
 
   const handleExportExcel = () => {
     const worksheet = XLSX.utils.json_to_sheet(filteredReqs);
@@ -145,6 +158,131 @@ const PurchaseRequisition: React.FC = () => {
     }
   };
 
+  const [rejectionReason, setRejectionReason] = useState('');
+  const [showRejectModal, setShowRejectModal] = useState(false);
+
+  const groupedReqs = useMemo(() => {
+    const groups: Record<string, IReq[]> = {};
+    filteredReqs.forEach(req => {
+      const key = req.requestNo || 'No Number';
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(req);
+    });
+    return Object.entries(groups).map(([requestNo, items]) => ({
+      requestNo,
+      items,
+      date: items[0].date,
+      branchName: items[0].branchName,
+      status: items[0].status
+    })).sort((a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime());
+  }, [filteredReqs]);
+
+  const toggleSelection = (requestNo: string) => {
+    setSelectedNos(prev => 
+      prev.includes(requestNo) 
+        ? prev.filter(no => no !== requestNo) 
+        : [...prev, requestNo]
+    );
+  };
+
+  const handleBulkApprove = async () => {
+    if (selectedNos.length === 0) return;
+    
+    setIsProcessing(true);
+    try {
+      const result = await apiService.purchaseRequests.updateStatus(selectedNos, 'W', '');
+      if (result.success) {
+        await fetchData();
+        setSelectedNos([]);
+      }
+    } catch (error) {
+      console.error("Toplu onay hatası:", error);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleDeleteRequest = async (requestNo: string) => {
+    if (!window.confirm(`${requestNo} numaralı talebi silmek istediğinize emin misiniz?`)) return;
+    
+    setIsProcessing(true);
+    try {
+      const result = await apiService.purchaseRequests.delete(requestNo);
+      if (result.success) {
+        await fetchData();
+        setSelectedNos(prev => prev.filter(no => no !== requestNo));
+      }
+    } catch (error) {
+      console.error("Talep silme hatası:", error);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleReject = async () => {
+    if (selectedNos.length === 0) return;
+    if (!rejectionReason.trim()) {
+      alert("Lütfen red nedeni belirtiniz.");
+      return;
+    }
+    
+    setIsProcessing(true);
+    try {
+      const result = await apiService.purchaseRequests.updateStatus(selectedNos, 'R', rejectionReason);
+      if (result.success) {
+        await fetchData();
+        setSelectedNos([]);
+        setShowRejectModal(false);
+        setRejectionReason('');
+      }
+    } catch (error) {
+      console.error("Red hatası:", error);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleQtyChange = async (requestNo: string, stockCode: string, newQty: number) => {
+    if (newQty < 0 || isNaN(newQty)) return;
+    
+    setIsProcessing(true);
+    try {
+      await apiService.purchaseRequests.updateItemQty(requestNo, stockCode, newQty);
+      await fetchData();
+    } catch (err) {
+      console.error("Miktar güncelleme hatası:", err);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const updateItemQtyInline = async (requestNo: string, stockCode: string, currentQty: number, delta: number) => {
+    const newQty = currentQty + delta;
+    handleQtyChange(requestNo, stockCode, newQty);
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'Onaylandı': case 'O': return 'bg-emerald-50 text-emerald-600 border-emerald-100';
+      case 'Reddedildi': case 'R': return 'bg-rose-50 text-rose-600 border-rose-100';
+      case 'Beklemede': case 'A': return 'bg-amber-50 text-amber-600 border-amber-100';
+      case 'W': case 'Onayda': return 'bg-sky-50 text-sky-600 border-sky-100';
+      case 'S': return 'bg-indigo-50 text-indigo-600 border-indigo-100';
+      default: return 'bg-slate-50 text-slate-600 border-slate-100';
+    }
+  };
+
+  const getStatusText = (status: string) => {
+    switch (status) {
+      case 'W': case 'Onayda': return 'Onay Bekliyor';
+      case 'A': case 'Beklemede': return 'Taslak / Beklemede';
+      case 'O': case 'Onaylandı': return 'ONAYLANDI';
+      case 'R': case 'Reddedildi': return 'REDDEDİLDİ';
+      case 'S': return 'SİPARİŞ VERİLDİ';
+      default: return status;
+    }
+  };
+
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-3 rounded-2xl border border-slate-200 shadow-sm">
@@ -157,6 +295,26 @@ const PurchaseRequisition: React.FC = () => {
         </div>
         
         <div className="flex items-center gap-2">
+          {selectedNos.length > 0 && (
+            <div className="flex items-center gap-2 animate-in slide-in-from-right-4 duration-300">
+              <button 
+                onClick={handleBulkApprove}
+                disabled={isProcessing}
+                className="flex items-center gap-2 px-6 py-2 bg-emerald-600 text-white rounded-xl text-xs font-black hover:bg-emerald-700 shadow-lg shadow-emerald-100 transition-all active:scale-95"
+              >
+                {isProcessing ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
+                Onaya Gönder ({selectedNos.length})
+              </button>
+              <button 
+                onClick={() => setShowRejectModal(true)}
+                disabled={isProcessing}
+                className="flex items-center gap-2 px-6 py-2 bg-rose-600 text-white rounded-xl text-xs font-black hover:bg-rose-700 shadow-lg shadow-rose-100 transition-all active:scale-95"
+              >
+                <XCircle size={16} />
+                Reddet
+              </button>
+            </div>
+          )}
           <button onClick={() => { setEditingId(null); setIsModalOpen(true); setSelectedItems({}); }} className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold hover:bg-indigo-700 transition-all active:scale-95 shadow-lg shadow-indigo-100"><Plus size={16} /> Yeni Toplu Talep</button>
           <button 
             onClick={handleExportExcel}
@@ -165,6 +323,32 @@ const PurchaseRequisition: React.FC = () => {
             <FileSpreadsheet size={16} className="text-emerald-700" /> Excel Aktar
           </button>
         </div>
+      </div>
+
+      {/* Tabs */}
+      <div className="flex items-center gap-1 bg-white p-1 rounded-2xl border border-slate-200 shadow-sm w-fit">
+        <button 
+          onClick={() => setActiveTab('active')}
+          className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
+            activeTab === 'active' 
+              ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-100' 
+              : 'text-slate-400 hover:text-indigo-600 hover:bg-indigo-50'
+          }`}
+        >
+          <FilePlus2 size={16} />
+          Bekleyen Talepler
+        </button>
+        <button 
+          onClick={() => setActiveTab('history')}
+          className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
+            activeTab === 'history' 
+              ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-100' 
+              : 'text-slate-400 hover:text-indigo-600 hover:bg-indigo-50'
+          }`}
+        >
+          <History size={16} />
+          Talep Geçmişi & Durum
+        </button>
       </div>
 
       <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm relative">
@@ -177,45 +361,211 @@ const PurchaseRequisition: React.FC = () => {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-slate-50/50 border-b border-slate-200">
-                <th className="px-6 py-5 text-[11px] font-black text-slate-400 uppercase tracking-widest">Şube / Ürün</th>
+                <th className="px-6 py-5 w-12 pr-0">
+                  <input 
+                    type="checkbox" 
+                    className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                    checked={groupedReqs.length > 0 && selectedNos.length === groupedReqs.length}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setSelectedNos(groupedReqs.map(r => r.requestNo).filter(no => no));
+                      } else {
+                        setSelectedNos([]);
+                      }
+                    }}
+                  />
+                </th>
+                <th className="px-6 py-5 text-[11px] font-black text-slate-400 uppercase tracking-widest text-left">Şube / Ürün</th>
                 <th className="px-6 py-5 text-[11px] font-black text-slate-400 uppercase tracking-widest text-center">Talep Miktarı</th>
-                <th className="px-6 py-5 text-[11px] font-black text-slate-400 uppercase tracking-widest text-center">Tarih</th>
-                <th className="px-6 py-5 text-[11px] font-black text-slate-400 uppercase tracking-widest text-center">Durum</th>
+                <th className="px-6 py-5 text-[11px] font-black text-slate-400 uppercase tracking-widest text-center">Mevcut Stok</th>
+                {activeTab === 'history' && <th className="px-6 py-5 text-[11px] font-black text-slate-400 uppercase tracking-widest text-center">Durum</th>}
+                <th className="px-6 py-5 text-[11px] font-black text-slate-400 uppercase tracking-widest text-center" colSpan={activeTab === 'history' ? 1 : 2}>Detay / Not</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {isLoading ? (
                 <tr>
-                  <td colSpan={4} className="px-6 py-12 text-center">
+                  <td colSpan={6} className="px-6 py-12 text-center">
                     <Loader2 className="w-8 h-8 text-indigo-600 animate-spin mx-auto mb-2" />
                     <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Veriler Yükleniyor...</p>
                   </td>
                 </tr>
-              ) : filteredReqs.length === 0 ? (
+              ) : groupedReqs.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="px-6 py-12 text-center text-slate-400 italic">Kayıt bulunamadı.</td>
+                  <td colSpan={6} className="px-6 py-12 text-center text-slate-400 italic">Kayıt bulunamadı.</td>
                 </tr>
-              ) : filteredReqs.map((r, idx) => (
-                <tr key={r.id || idx} className="hover:bg-indigo-50/20 transition-all group">
-                  <td className="px-6 py-4">
-                    <p className="text-sm font-black text-slate-800">{r.stockName || 'Stok Bilgisi Yok'}</p>
-                    <p className="text-[10px] text-slate-400 uppercase tracking-tighter">{r.branchName || '-'} • {r.requestNo} • {r.stockCode || 'N/A'}</p>
-                  </td>
-                  <td className="px-6 py-4 text-center font-black text-indigo-600 font-mono">{(r.requestedQty || 0).toLocaleString()}</td>
-                  <td className="px-6 py-4 text-center text-[10px] font-bold text-slate-500 uppercase">{r.date ? new Date(r.date).toLocaleDateString('tr-TR') : '-'}</td>
-                  <td className="px-6 py-4 text-center">
-                    <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase border ${
-                      r.status === 'Beklemede' ? 'bg-amber-50 text-amber-600 border-amber-100' :
-                      r.status === 'Onaylandı' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
-                      'bg-rose-50 text-rose-600 border-rose-100'
-                    }`}>{r.status}</span>
-                  </td>
-                </tr>
+              ) : groupedReqs.map((group, gIdx) => (
+                <React.Fragment key={group.requestNo || gIdx}>
+                  {/* Group Header */}
+                  <tr className={`border-t border-slate-100 transition-colors ${selectedNos.includes(group.requestNo) ? 'bg-indigo-50/40' : 'bg-slate-50/30'}`}>
+                    <td className="px-6 py-3">
+                      <input 
+                        type="checkbox" 
+                        className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                        checked={selectedNos.includes(group.requestNo)}
+                        onChange={() => toggleSelection(group.requestNo)}
+                      />
+                    </td>
+                    <td className="px-6 py-3" colSpan={3}>
+                      <div className="flex items-center gap-4">
+                        <div className="px-2 py-1 bg-indigo-600 text-white rounded text-[10px] font-black tracking-tighter shadow-sm">
+                          # {group.requestNo}
+                        </div>
+                        <span className="text-[11px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+                          <Building size={12} className="text-slate-300" /> {group.branchName || 'Genel'}
+                        </span>
+                        <span className="text-[11px] font-bold text-slate-300">|</span>
+                        <span className="text-[11px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+                          <Clock size={12} className="text-slate-300" /> {group.date ? new Date(group.date).toLocaleDateString('tr-TR') : '-'}
+                        </span>
+                        {activeTab === 'history' && (
+                          <span className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase border ml-2 ${getStatusColor(group.status)}`}>
+                            {getStatusText(group.status)}
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-6 py-3 text-center">
+                      <div className="flex flex-col items-center">
+                         <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase border ${getStatusColor(group.status)}`}>
+                          {getStatusText(group.status)}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-3 text-right">
+                      {activeTab === 'active' && (
+                        <button 
+                          onClick={() => handleDeleteRequest(group.requestNo)}
+                          disabled={isProcessing}
+                          className="p-2 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"
+                          title="Talebi Sil"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+
+                  {/* Group Items */}
+                  {group.items.map((item, iIdx) => (
+                    <tr key={`${group.requestNo}-${iIdx}`} className="hover:bg-slate-50/50 transition-colors border-l-4 border-l-transparent hover:border-l-indigo-500">
+                      <td className="px-6 py-4"></td>
+                      <td className="px-6 py-4">
+                        <p className="text-sm font-black text-slate-800 tracking-tight">{item.stockName || 'Stok Bilgisi Yok'}</p>
+                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{item.stockCode || 'N/A'}</p>
+                      </td>
+                      <td className="px-6 py-4 text-center">
+                        <div className="flex flex-col items-center">
+                          {activeTab === 'active' ? (
+                            <div className="flex items-center gap-2 mb-1">
+                              <button 
+                                onClick={() => updateItemQtyInline(group.requestNo, item.stockCode, item.requestedQty, -1)}
+                                disabled={isProcessing}
+                                className="w-6 h-6 flex items-center justify-center bg-slate-100 hover:bg-rose-50 text-slate-400 hover:text-rose-600 rounded-md transition-all active:scale-90"
+                              >
+                                <Minus size={12} />
+                              </button>
+                              <input 
+                                type="number"
+                                className="w-16 p-1 text-center text-sm font-black text-indigo-600 bg-slate-50 border border-slate-200 rounded-lg focus:border-indigo-500 outline-none tabular-nums"
+                                value={item.requestedQty}
+                                onChange={(e) => {
+                                  const val = parseFloat(e.target.value);
+                                  if (!isNaN(val)) {
+                                    setReqs(prev => prev.map(r => 
+                                      (r.requestNo === group.requestNo && r.stockCode === item.stockCode) 
+                                        ? { ...r, requestedQty: val } 
+                                        : r
+                                    ));
+                                  }
+                                }}
+                                onBlur={(e) => {
+                                  const val = parseFloat(e.target.value);
+                                  if (!isNaN(val)) {
+                                    handleQtyChange(group.requestNo, item.stockCode, val);
+                                  }
+                                }}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    const val = parseFloat((e.target as HTMLInputElement).value);
+                                    if (!isNaN(val)) {
+                                      handleQtyChange(group.requestNo, item.stockCode, val);
+                                    }
+                                  }
+                                }}
+                              />
+                              <button 
+                                onClick={() => updateItemQtyInline(group.requestNo, item.stockCode, item.requestedQty, 1)}
+                                disabled={isProcessing}
+                                className="w-6 h-6 flex items-center justify-center bg-slate-100 hover:bg-emerald-50 text-slate-400 hover:text-emerald-600 rounded-md transition-all active:scale-90"
+                              >
+                                <Plus size={12} />
+                              </button>
+                            </div>
+                          ) : (
+                            <span className="text-sm font-black text-indigo-600 tabular-nums">{item.requestedQty}</span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-center font-bold text-slate-300 font-mono">{(item.currentStock || 0).toLocaleString()}</td>
+                      <td className="px-6 py-4" colSpan={2}>
+                        {item.description && (
+                          <div className="px-3 py-2 bg-slate-50 border border-slate-100 rounded-lg max-w-xs ml-auto">
+                            <p className="text-[10px] text-slate-400 italic flex items-center gap-1.5">
+                              <Info size={10} className="text-indigo-400 shrink-0" /> {item.description}
+                            </p>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </React.Fragment>
               ))}
             </tbody>
           </table>
         </div>
       </div>
+
+      {/* Reject Modal */}
+      {showRejectModal && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in duration-300">
+            <div className="p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-12 h-12 bg-rose-50 text-rose-600 rounded-2xl flex items-center justify-center">
+                  <BadgeAlert size={24} />
+                </div>
+                <div>
+                  <h3 className="text-lg font-black text-slate-800">Talebi Reddet</h3>
+                  <p className="text-xs text-slate-400 font-bold">Red gerekçesini aşağıda belirtebilirsiniz.</p>
+                </div>
+              </div>
+              
+              <textarea 
+                className="w-full h-32 p-4 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-rose-500 transition-all font-medium resize-none"
+                placeholder="Örn: Bütçe aşımı, alternatif stok mevcut..."
+                value={rejectionReason}
+                onChange={(e) => setRejectionReason(e.target.value)}
+              />
+            </div>
+            
+            <div className="p-4 bg-slate-50 flex items-center justify-end gap-3">
+              <button 
+                onClick={() => setShowRejectModal(false)}
+                className="px-6 py-2 text-xs font-bold text-slate-500 hover:bg-slate-200 rounded-xl transition-all"
+              >
+                Vazgeç
+              </button>
+              <button 
+                onClick={handleReject}
+                className="px-6 py-2 bg-rose-600 text-white rounded-xl text-xs font-black hover:bg-rose-700 transition-all shadow-lg shadow-rose-100"
+              >
+                Reddet ve Kaydet
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {isModalOpen && (
         <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">

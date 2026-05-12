@@ -27,12 +27,12 @@ namespace tuckapi.Controllers
                         RTRIM(F.CARI_KODU) as CustomerCode,
                         ISNULL(dbo.TRK(C.CARI_ISIM), '') as CustomerName,
                         F.TARIH as Date,
-                        F.GENELTOPLAM as TotalAmount,
-                        ISNULL(F.GIB_FATIRS_NO, '') as GibInvoiceNo,
+                        ISNULL(F.BRUTTUTAR, 0) + ISNULL(F.KDV, 0) as TotalAmount,
+                        ISNULL(F.FATIRS_NO, '') as GibInvoiceNo,
                         ISNULL(dbo.TRK(F.ACIKLAMA), '') as Description
-                    FROM TBLFATUIRS F WITH (NOLOCK)
+                    FROM TBLSIPAMAS F WITH (NOLOCK)
                     LEFT JOIN TBLCASABIT C WITH (NOLOCK) ON C.CARI_KOD = F.CARI_KODU
-                    WHERE F.FTIRSIP = '4' 
+                    WHERE F.FTIRSIP = '7' 
                     ORDER BY F.TARIH DESC";
 
                 var invoices = await conn.QueryAsync(sql);
@@ -51,17 +51,17 @@ namespace tuckapi.Controllers
             try
             {
                 using var conn = new SqlConnection(_connStr);
-                string sql = "SELECT TOP 1 FATIRS_NO FROM TBLFATUIRS WHERE FTIRSIP = '4' AND FATIRS_NO LIKE 'FLX%' ORDER BY FATIRS_NO DESC";
+                string sql = "SELECT TOP 1 FATIRS_NO FROM TBLSIPAMAS WHERE FTIRSIP = '7' AND FATIRS_NO LIKE 'T%' ORDER BY FATIRS_NO DESC";
                 var lastNo = await conn.QueryFirstOrDefaultAsync<string>(sql);
 
-                string nextNo = "FLX000000000001";
+                string nextNo = "T00000000000001";
 
                 if (!string.IsNullOrEmpty(lastNo))
                 {
-                    string numericPart = lastNo.Replace("FLX", "");
+                    string numericPart = new string(lastNo.Where(char.IsDigit).ToArray());
                     if (long.TryParse(numericPart, out long currentNum))
                     {
-                        nextNo = "FLX" + (currentNum + 1).ToString().PadLeft(12, '0');
+                        nextNo = "T" + (currentNum + 1).ToString().PadLeft(14, '0');
                     }
                 }
 
@@ -88,15 +88,14 @@ namespace tuckapi.Controllers
                         RTRIM(F.CARI_KODU) as CustomerCode,
                         ISNULL(dbo.TRK(C.CARI_ISIM), '') as CustomerName,
                         F.TARIH as Date,
-                        F.GENELTOPLAM as TotalAmount,
-                        ISNULL(F.GIB_FATIRS_NO, '') as GibInvoiceNo,
+                        ISNULL(F.BRUTTUTAR, 0) + ISNULL(F.KDV, 0) as TotalAmount,
+                        ISNULL(F.FATIRS_NO, '') as GibInvoiceNo,
                         ISNULL(dbo.TRK(F.ACIKLAMA), '') as Description,
                         F.TIPI as Type,
-                        RTRIM(F.PROJE_KODU) as ProjectCode,
-                        F.D_YEDEK10 as DeliveryDate
-                    FROM TBLFATUIRS F WITH (NOLOCK)
+                        F.TARIH as DeliveryDate
+                    FROM TBLSIPAMAS F WITH (NOLOCK)
                     LEFT JOIN TBLCASABIT C WITH (NOLOCK) ON C.CARI_KOD = F.CARI_KODU
-                    WHERE F.FTIRSIP = '4' AND F.FATIRS_NO = @invoiceNo";
+                    WHERE F.FTIRSIP = '7' AND F.FATIRS_NO = @invoiceNo";
 
                 var header = await conn.QueryFirstOrDefaultAsync<dynamic>(sqlHeader, new { invoiceNo });
                 if (header == null) return NotFound(new { message = "İrsaliye bulunamadı." });
@@ -111,9 +110,9 @@ namespace tuckapi.Controllers
                         H.STHAR_KDV as Vat,
                         RTRIM(H.DEPO_KODU) as WarehouseCode,
                         RTRIM(H.OLCUBR) as Unit
-                    FROM TBLSTHAR H WITH (NOLOCK)
-                    LEFT JOIN TBLSTSABIT S WITH (NOLOCK) ON S.STOK_KODU = H.STOK_KODU AND S.DEPO_KODU = 100
-                    WHERE H.STHAR_FTIRSIP = '4' AND H.FISNO = @invoiceNo";
+                    FROM TBLSIPATRA H WITH (NOLOCK)
+                    LEFT JOIN TBLSTSABIT S WITH (NOLOCK) ON S.STOK_KODU = H.STOK_KODU
+                    WHERE H.STHAR_FTIRSIP = '7' AND H.FATIRS_NO = @invoiceNo";
 
                 var items = await conn.QueryAsync<dynamic>(sqlItems, new { invoiceNo });
 
@@ -152,26 +151,15 @@ namespace tuckapi.Controllers
             try
             {
                 var existing = await conn.QueryFirstOrDefaultAsync<int>(
-                    "SELECT COUNT(1) FROM TBLFATUIRS WHERE FATIRS_NO = @InvoiceNo AND FTIRSIP = '4'",
+                    "SELECT COUNT(1) FROM TBLSIPAMAS WHERE FATIRS_NO = @InvoiceNo AND FTIRSIP = '7'",
                     new { request.InvoiceNo }, transaction);
 
                 if (existing > 0)
                 {
-                    return BadRequest(new { message = $"Hata: {request.InvoiceNo} numaralı irsaliye zaten mevcut!" });
+                    return BadRequest(new { message = $"Hata: {request.InvoiceNo} numaralı sipariş zaten mevcut!" });
                 }
 
                 DateTime docDate = string.IsNullOrEmpty(request.Date) ? DateTime.Now : DateTime.Parse(request.Date);
-
-                // Sıradaki Ambar Kabul No'yu al (Netsis standartlarına uygun otomatik artan numara)
-                string maxAmbarNoStr = await conn.QueryFirstOrDefaultAsync<string>(
-                    "SELECT MAX(AMBAR_KABULNO) FROM TBLSTHAR WHERE AMBAR_KABULNO LIKE '000000000000%'",
-                    null, transaction);
-                long nextAmbarNoVal = 1;
-                if (!string.IsNullOrEmpty(maxAmbarNoStr) && long.TryParse(maxAmbarNoStr, out long currentMax))
-                {
-                    nextAmbarNoVal = currentMax + 1;
-                }
-                string nextAmbarNo = nextAmbarNoVal.ToString().PadLeft(15, '0');
 
                 // Kalem bazlı KDV oranlarını çek ve toplamları hesapla
                 decimal totalBrut = 0;
@@ -181,33 +169,28 @@ namespace tuckapi.Controllers
                 foreach (var item in request.Items)
                 {
                     var kdvRate = await conn.QueryFirstOrDefaultAsync<decimal>(
-                        "SELECT ISNULL(KDV_ORANI, 0) FROM TBLSTSABIT WHERE STOK_KODU = @StockCode AND DEPO_KODU = 100",
+                        "SELECT TOP 1 ISNULL(KDV_ORANI, 0) FROM TBLSTSABIT WHERE STOK_KODU = @StockCode",
                         new { item.StockCode }, transaction);
 
                     totalBrut += item.Quantity * item.Price;
                     totalKdv += Math.Round((item.Quantity * item.Price * kdvRate) / 100, 2);
                     itemDetails.Add((item, kdvRate));
                 }
-                decimal totalGenel = totalBrut + totalKdv;
 
-                // A. TBLFATUIRS (BAŞLIK)
-                string sqlHeader = @"
-                    INSERT INTO TBLFATUIRS (
+                // Detect MAS columns
+                var masColsAll = (await conn.QueryAsync<string>("SELECT name FROM sys.columns WHERE object_id = OBJECT_ID('TBLSIPAMAS')", transaction: transaction)).ToList();
+                string masKayitKulCol = masColsAll.FirstOrDefault(c => new[] { "KAYITYAPANKUL", "KAYIT_YAPAN" }.Contains(c)) ?? "KAYIT_YAPAN";
+
+                // A. TBLSIPAMAS (BAŞLIK)
+                string sqlHeader = $@"
+                    INSERT INTO TBLSIPAMAS (
                         SUBE_KODU, FTIRSIP, FATIRS_NO, CARI_KODU, TARIH, TIPI, 
-                        BRUTTUTAR, GENELTOPLAM, KDV, ACIKLAMA, 
-                        KOD1, KDV_DAHILMI, KAPATILMIS, C_YEDEK6, EBELGE,
-                        ISLETME_KODU, KAYITTARIHI, KAYITYAPANKUL, GIB_FATIRS_NO, PROJE_KODU,
-                        FATKALEM_ADEDI, ONAYTIPI, ONAYNUM, VADEBAZT,
-                        ODEMETARIHI, SIPARIS_TEST, KS_KODU, HALFAT, UPDATE_KODU, FATURALASMAYACAK,
-                        AMBAR_KBLNO, D_YEDEK10, GELSUBE_KODU, GITSUBE_KODU
+                        BRUTTUTAR, KDV, ACIKLAMA, 
+                        KDV_DAHILMI, ISLETME_KODU, KAYITTARIHI, {masKayitKulCol}
                     ) VALUES (
-                        0, '4', @InvoiceNo, @CustomerCode, @Date, 2, 
-                        @BrutTutar, @GenelToplam, @KdvTutar, @Description, 
-                        @Kod1, 'H', NULL, 'X', 0,
-                        1, GETDATE(), 'FLEX_API', '', '100',
-                        @ItemCount, 'A', 0, NULL,
-                        @Date, @Date, '001', 0, NULL, 'H',
-                        @AmbarKblNo, @Date, 0, 0
+                        0, '7', @InvoiceNo, @CustomerCode, @Date, 2, 
+                        @BrutTutar, @KdvTutar, @Description, 
+                        'H', 0, GETDATE(), 'FLX'
                     )";
 
                 await conn.ExecuteAsync(sqlHeader, new
@@ -216,50 +199,34 @@ namespace tuckapi.Controllers
                     CustomerCode = request.CustomerCode,
                     Date = docDate,
                     BrutTutar = totalBrut,
-                    GenelToplam = totalGenel,
                     KdvTutar = totalKdv,
-                    Description = (string)null, // Üst bilgide açıklama NULL istendi
-                    Kod1 = "M",
-                    ItemCount = request.Items.Count,
-                    AmbarKblNo = nextAmbarNo
+                    Description = request.Description
                 }, transaction);
 
-                // A2. TBLFATUEK (Ek Bilgi)
-                string sqlExtra = @"
-                    INSERT INTO TBLFATUEK (
-                        SUBE_KODU, FKOD, FATIRSNO, CKOD, SIRALAMATURU, LIMITALTITEVKIFAT
-                    ) VALUES (
-                        0, '4', @InvoiceNo, @CustomerCode, '', 'H'
-                    )";
-                await conn.ExecuteAsync(sqlExtra, new { request.InvoiceNo, request.CustomerCode }, transaction);
-
-                // B. TBLSTHAR (Kalem Bilgileri)
+                // B. TBLSIPATRA (Kalem Bilgileri)
                 short sira = 1;
+                var traColsAll = (await conn.QueryAsync<string>("SELECT name FROM sys.columns WHERE object_id = OBJECT_ID('TBLSIPATRA')", transaction: transaction)).ToList();
+                string traKayitKulCol = traColsAll.FirstOrDefault(c => new[] { "KAYITYAPANKUL", "KAYIT_YAPAN" }.Contains(c)) ?? "KAYIT_YAPAN";
+
                 foreach (var detail in itemDetails)
                 {
                     var item = detail.item;
                     var kdvRate = detail.kdvRate;
 
-                    string sqlItem = @"
-                        INSERT INTO TBLSTHAR (
-                            SUBE_KODU, FISNO, STOK_KODU, STHAR_GCMIK, STHAR_GCMIK2,
+                    string sqlItem = $@"
+                        INSERT INTO TBLSIPATRA (
+                            SUBE_KODU, FATIRS_NO, STOK_KODU, STHAR_GCMIK, STHAR_GCMIK2,
                             STHAR_GCKOD, STHAR_HTUR, STHAR_FTIRSIP,
                             STHAR_TARIH, STHAR_NF, STHAR_BF, DEPO_KODU, OLCUBR,
-                            SIRA, STHAR_BGTIP, STHAR_KOD1, STHAR_CARIKOD, CEVRIM,
-                            STHAR_KDV, LISTE_FIAT, STHAR_DOVTIP, STHAR_DOVFIAT,
-                            STHAR_ACIKLAMA, STHAR_TESTAR, IRSALIYE_NO, IRSALIYE_TARIH, PROJE_KODU, UPDATE_KODU,
-                            AMBAR_KABULNO
+                            SIRA, STHAR_KDV, {traKayitKulCol}
                         ) VALUES (
                             0, @InvoiceNo, @StockCode, @Quantity, @Quantity,
-                            'G', 'H', '4',
+                            'G', 'H', '7',
                             @Date, @Price, @Price, 100, 1,
-                            @Sira, 'I', 'M', @CustomerCode, 1,
-                            @KdvRate, 1, 0, 0,
-                            @ItemDescription, @Date, @InvoiceNo, @Date, '100', NULL,
-                            @AmbarKabulNo
+                            @Sira, @KdvRate, 'FLX'
                         )";
 
-                    var itemParams = new
+                    await conn.ExecuteAsync(sqlItem, new
                     {
                         InvoiceNo = request.InvoiceNo,
                         StockCode = item.StockCode,
@@ -267,19 +234,33 @@ namespace tuckapi.Controllers
                         Date = docDate,
                         Price = item.Price,
                         Sira = sira++,
-                        CustomerCode = request.CustomerCode,
-                        KdvRate = kdvRate,
-                        AmbarKabulNo = nextAmbarNo,
-                        ItemDescription = request.CustomerCode // Kalem açıklamasına cari kod yazılması istendi
-                    };
+                        KdvRate = kdvRate
+                    }, transaction);
 
-                    await conn.ExecuteAsync(sqlItem, itemParams, transaction);
+                    // Eğer bir siparişe istinaden giriliyorsa, o siparişin gerçekleşen miktarını (GCMIK2) güncelle
+                    if (!string.IsNullOrEmpty(item.OrderNo))
+                    {
+                        string updateOrderSql = @"
+                            UPDATE TBLSIPATRA 
+                            SET STHAR_GCMIK2 = ISNULL(STHAR_GCMIK2, 0) + @Quantity 
+                            WHERE FATIRS_NO = @OrderNo AND STOK_KODU = @StockCode AND STHAR_FTIRSIP = '7'";
+
+                        if (item.OrderLineNo > 0)
+                        {
+                            updateOrderSql += " AND SIRA = @OrderLineNo";
+                        }
+                        
+                        await conn.ExecuteAsync(updateOrderSql, new { 
+                            Quantity = item.Quantity, 
+                            OrderNo = item.OrderNo, 
+                            item.StockCode,
+                            OrderLineNo = item.OrderLineNo
+                        }, transaction);
+                    }
                 }
 
-                // TBLSTOKURS ve TBLCAHAR kayıtları kullanıcı isteği üzerine iptal edildi.
-
                 transaction.Commit();
-                return Ok(new { success = true, message = "Kayıt başarılı (Netsis Standartlarına Uygun)." });
+                return Ok(new { success = true, message = "Kayıt başarılı (Sipariş Bazlı İrsaliye)." });
             }
             catch (Exception ex)
             {
@@ -312,5 +293,7 @@ namespace tuckapi.Controllers
         public decimal Price { get; set; }
         public string? Unit { get; set; }
         public string WarehouseCode { get; set; }
+        public string? OrderNo { get; set; }
+        public int OrderLineNo { get; set; }
     }
 }
