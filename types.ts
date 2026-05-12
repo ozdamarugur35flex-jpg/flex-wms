@@ -65,6 +65,9 @@ export interface CustomerCard {
   taxOffice?: string;
   phone?: string;
   email?: string;
+  address?: string;
+  city?: string;
+  district?: string;
   projectCode?: string;
   specialCode1?: string;
 }
@@ -467,6 +470,7 @@ export interface StockListItem {
     name: string;
     groupCode: string;
     unit: string;
+    barcode?: string;
 }
 
 export interface StockMovementReportItem {

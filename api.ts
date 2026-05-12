@@ -53,6 +53,9 @@ const mapCustomerData = (item: any) => {
     taxOffice: item.taxOffice || item.TaxOffice || '',
     phone: item.phone || item.Phone || '',
     email: item.email || item.Email || '',
+    address: item.address || item.Address || '',
+    city: item.city || item.City || '',
+    district: item.district || item.District || '',
     projectCode: item.projectCode || item.ProjectCode || '',
   };
 };
@@ -149,6 +152,7 @@ const mapPurchaseOrderItemData = (item: any) => {
     stockName: item.stockName || item.StockName || '',
     branchName: item.branchName || item.BranchName || '',
     supplierName: item.supplierName || item.SupplierName || '',
+    customerCode: item.customerCode || item.CustomerCode || '',
     orderedQty: Number(item.orderedQty ?? item.OrderedQty ?? 0),
     receivedQty: Number(item.receivedQty ?? item.ReceivedQty ?? 0),
     balance: Number(item.balance ?? item.Balance ?? 0),

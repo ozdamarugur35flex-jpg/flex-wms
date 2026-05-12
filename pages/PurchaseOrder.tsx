@@ -1,6 +1,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { motion, AnimatePresence } from 'motion/react';
 import { 
   ShoppingCart, 
   Search, 
@@ -25,7 +26,8 @@ import {
   Building,
   Edit,
   Loader2,
-  ExternalLink
+  ExternalLink,
+  TrendingDown
 } from 'lucide-react';
 import { PurchaseOrderItem, DeliveryHistory } from '../types';
 import { apiService } from '../api';
@@ -243,6 +245,7 @@ const PurchaseOrder: React.FC = () => {
         </div>
       </div>
 
+      <AnimatePresence>
       {selectedOrder && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 lg:p-0">
           <motion.div 
@@ -386,6 +389,7 @@ const PurchaseOrder: React.FC = () => {
                         orderLineNo: lineNo,
                         stockCode: selectedOrder.stockCode,
                         customerCode: selectedOrder.customerCode,
+                        customerName: selectedOrder.supplierName,
                         qty: receiveQty > 0 ? receiveQty : selectedOrder.balance
                       } 
                     });
@@ -416,6 +420,7 @@ const PurchaseOrder: React.FC = () => {
           </motion.div>
         </div>
       )}
+      </AnimatePresence>
     </div>
   );
 };

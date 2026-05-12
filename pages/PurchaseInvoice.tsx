@@ -35,13 +35,14 @@ import SearchableSelect from '../components/SearchableSelect';
 const PurchaseInvoice: React.FC = () => {
   const today = new Date().toISOString().split('T')[0];
   const location = useLocation();
-  const prefillState = location.state as { orderNo: string, orderLineNo: string, stockCode: string, customerCode: string, qty: number } | null;
+  const prefillState = location.state as { orderNo: string, orderLineNo: string, stockCode: string, customerCode: string, customerName?: string, qty: number } | null;
   
   const [activeTab, setActiveTab] = useState<'header' | 'lines' | 'history'>('header');
   const [isExtraFieldsOpen, setExtraFieldsOpen] = useState(false);
   const [items, setItems] = useState<InvoiceItem[]>([]);
   const [stocks, setStocks] = useState<StockCard[]>([]);
   const [customers, setCustomers] = useState<CustomerCard[]>([]);
+  const [selectedCustomer, setSelectedCustomer] = useState<CustomerCard | null>(null);
   const [history, setHistory] = useState<any[]>([]);
   const [historySearch, setHistorySearch] = useState('');
   const [isHistoryLoading, setIsHistoryLoading] = useState(false);
@@ -91,29 +92,18 @@ const PurchaseInvoice: React.FC = () => {
   // Prefill Logic
   useEffect(() => {
     if (prefillState && customers.length > 0 && stocks.length > 0) {
-      const customer = customers.find(c => 
-        c.code.trim().toUpperCase() === prefillState.customerCode.trim().toUpperCase()
-      );
+      // User says: "tedarıkcı secme ısını ben yapıcam... otomatık gelmesın"
+      // So we don't automatically set the customer from prefillState
+      
+      setInvoiceHeader(prev => ({
+        ...prev,
+        description: `Sipariş No: ${prefillState.orderNo} istinaden`
+      }));
+
       const stock = stocks.find(s => 
-        s.code.trim().toUpperCase() === prefillState.stockCode.trim().toUpperCase()
+        s.code?.trim().toUpperCase() === prefillState.stockCode?.trim().toUpperCase()
       );
       
-      if (customer) {
-        setInvoiceHeader(prev => ({
-          ...prev,
-          customerCode: customer.code,
-          customerName: customer.name,
-          description: `Sipariş No: ${prefillState.orderNo} istinaden`
-        }));
-      } else {
-        setInvoiceHeader(prev => ({
-          ...prev,
-          customerCode: prefillState.customerCode,
-          customerName: 'BELİRSİZ CARİ (' + prefillState.customerCode + ')',
-          description: `Sipariş No: ${prefillState.orderNo} istinaden`
-        }));
-      }
-
       if (stock) {
         const newLine: InvoiceItem = {
           id: Math.random().toString(36).substr(2, 9),
@@ -171,6 +161,10 @@ const PurchaseInvoice: React.FC = () => {
           type: detail.type || 'YURT İÇİ',
           description: detail.description || ''
         });
+
+        const customer = customers.find(c => c.code === detail.customerCode);
+        if (customer) setSelectedCustomer(customer);
+
         setItems(detail.items || []);
         setIsEditMode(true);
         setActiveTab('header');
@@ -216,6 +210,7 @@ const PurchaseInvoice: React.FC = () => {
   const handleCustomerChange = (code: string) => {
     const customer = customers.find(c => c.code === code);
     if (customer) {
+      setSelectedCustomer(customer);
       setInvoiceHeader(prev => ({
         ...prev,
         customerCode: code,
@@ -571,7 +566,14 @@ const PurchaseInvoice: React.FC = () => {
                    <div>
                       <p className="text-[10px] font-black text-emerald-400 uppercase tracking-[0.2em] mb-1">Seçili Tedarikçi Bilgisi</p>
                       <h3 className="text-xl font-black tracking-tight">{invoiceHeader.customerName}</h3>
-                      <p className="text-xs font-medium text-slate-400 mt-1 max-w-[400px] leading-relaxed flex items-start gap-1.5"><MapPin size={14} className="shrink-0 mt-0.5" /> İkitelli OSB, Metal İş San. Sit. 12. Blok No: 45 Başakşehir/İstanbul</p>
+                      <p className="text-xs font-medium text-slate-400 mt-1 max-w-[400px] leading-relaxed flex items-start gap-1.5">
+                        <MapPin size={14} className="shrink-0 mt-0.5" /> 
+                        {selectedCustomer?.address ? (
+                          `${selectedCustomer.address} ${selectedCustomer.district || ''} ${selectedCustomer.city || ''}`
+                        ) : (
+                          "İkitelli OSB, Metal İş San. Sit. 12. Blok No: 45 Başakşehir/İstanbul"
+                        )}
+                      </p>
                    </div>
                 </div>
                 <div className="absolute top-0 right-0 p-12 opacity-5 pointer-events-none">

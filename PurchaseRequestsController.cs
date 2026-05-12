@@ -489,8 +489,8 @@ namespace FlexWms.Api.Controllers
                         // OLCUBR is tinyint (numeric index) in TBLSIPATRA for this DB version
                         int unit = 1; 
 
-                        var traCols = new List<string> { itemLinkCol, "STOK_KODU", "STHAR_GCMIK", "STHAR_TARIH", "STHAR_FTIRSIP", "STHAR_GCKOD", "SIRA", "OLCUBR", "STHAR_KDV" };
-                        var traVals = new List<string> { "@FisNo", "@StockCode", "@Qty", "@Date", "'7'", "'G'", "@Sira", "@Unit", "20" };
+                        var traCols = new List<string> { itemLinkCol, "STOK_KODU", "STHAR_GCMIK", "STHAR_TARIH", "STHAR_FTIRSIP", "STHAR_GCKOD", "STHAR_HTUR", "SIRA", "OLCUBR", "STHAR_KDV" };
+                        var traVals = new List<string> { "@FisNo", "@StockCode", "@Qty", "@Date", "'7'", "'G'", "'H'", "@Sira", "@Unit", "20" };
 
                         if (hasTraitKayitKul) { traCols.Add("KAYITYAPANKUL"); traVals.Add("'FLX'"); }
                         if (hasTraSubeKodu) { traCols.Add("SUBE_KODU"); traVals.Add("0"); }
